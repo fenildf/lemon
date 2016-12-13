@@ -1,0 +1,13 @@
+#define PLUS                            1
+#define MINUS                           2
+#define DIVIDE                          3
+#define TIMES                           4
+#define POW                             5
+#define NOT                             6
+#define NEWLINE                         7
+#define NAME                            8
+#define EQ                              9
+#define LP                             10
+#define RP                             11
+#define NUM                            12
+#define COMMA                          13
