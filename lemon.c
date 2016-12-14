@@ -114,7 +114,7 @@ typedef enum {B_FALSE=0, B_TRUE} Boolean;
 
 /* Symbols (terminals and nonterminals) of the grammar are stored
 ** in the following: */
-struct symbol {
+struct symbol { // symbol 结构体的作用是存储愈发文件中的终结符与非终结符,两者的相同特征太多,所以统一用symbol来标识
   char *name;              /* Name of the symbol */
   int index;               /* Index number for this symbol */
   enum {
@@ -144,15 +144,15 @@ struct symbol {
 
 /* Each production rule in the grammar is stored in the following
 ** structure.  */
-struct rule {
-  struct symbol *lhs;      /* Left-hand side of the rule */
-  char *lhsalias;          /* Alias for the LHS (NULL if none) */
-  int ruleline;            /* Line number for the rule */
-  int nrhs;                /* Number of RHS symbols */
+struct rule { // 产生式
+  struct symbol *lhs;      /* Left-hand side of the rule */ // 它指向产生式定义符(::=)左边的那个符号,大家知道,左边符号肯定是一个非终结符
+  char *lhsalias;          /* Alias for the LHS (NULL if none) */ // expr(A) ::= 表示别名,小括号里面的那个A
+  int ruleline;            /* Line number for the rule */ // 本产生式 排序中的序号
+  int nrhs;                /* Number of RHS symbols */ // 产生式右边所有符号的总数,既包括非终止符,也包括终止符
   struct symbol **rhs;     /* The RHS symbols */
-  char **rhsalias;         /* An alias for each RHS symbol (NULL if none) */
+  char **rhsalias;         /* An alias for each RHS symbol (NULL if none) */ // 右边的别名
   int line;                /* Line number at which code begins */
-  char *code;              /* The code executed when this rule is reduced */
+  char *code;              /* The code executed when this rule is reduced */ //规约时,执行的动作代码
   struct symbol *precsym;  /* Precedence symbol for this rule */
   int index;               /* An index number for this rule */
   Boolean canReduce;       /* True if this rule is ever reduced */
@@ -165,7 +165,7 @@ struct rule {
 ** Configurations also contain a follow-set which is a list of terminal
 ** symbols which are allowed to immediately follow the end of the rule.
 ** Every configuration is recorded as an instance of the following: */
-struct config {
+struct config { // config 用于存储项目, 项目是产生式的变形,在产生式右部的某处加点。(LEMON在.out文件中用*号代替了黑点)
   struct rule *rp;         /* The rule upon which the configuration is based */
   int dot;                 /* The parse point */
   char *fws;               /* Follow-set for this configuration only */
@@ -181,7 +181,7 @@ struct config {
 };
 
 /* Every shift or reduce operation is stored as one of the following */
-struct action {
+struct action { // 语法分析器中的有穷自动机
   struct symbol *sp;       /* The look-ahead symbol */
   enum e_action {
     SHIFT,
@@ -196,7 +196,7 @@ struct action {
   union {
     struct state *stp;     /* The new state, if a shift */
     struct rule *rp;       /* The rule, if a reduce */
-  } x;
+  } x; // 如果这个动作是移进,则联合取状态state。如果是归约,则联合取产生式rule
   struct action *next;     /* Next action for this state */
   struct action *collide;  /* Next action with the same hash */
 };
@@ -207,7 +207,7 @@ struct state {
   struct config *bp;       /* The basis configurations for this state */
   struct config *cfp;      /* All configurations in this set */
   int index;               /* Sequencial number for this state */
-  struct action *ap;       /* Array of actions for this state */
+  struct action *ap;       /* Array of actions for this state */ //action 移进 规约 出错 接受
   int nTknAct, nNtAct;     /* Number of actions on terminals and nonterminals */
   int iTknOfst, iNtOfst;   /* yy_action[] offset for terminals and nonterms */
   int iDflt;               /* Default action */
@@ -227,45 +227,45 @@ struct plink {
 ** static variables.  Fields in the following structure can be thought
 ** of as begin global variables in the program.) */
 struct lemon {
-  struct state **sorted;   /* Table of states sorted by state number */
-  struct rule *rule;       /* List of all rules */
-  int nstate;              /* Number of states */
-  int nrule;               /* Number of rules */
-  int nsymbol;             /* Number of terminal and nonterminal symbols */
-  int nterminal;           /* Number of terminal symbols */
-  struct symbol **symbols; /* Sorted array of pointers to symbols */
-  int errorcnt;            /* Number of errors */
-  struct symbol *errsym;   /* The error symbol */
-  char *name;              /* Name of the generated parser */
-  char *arg;               /* Declaration of the 3th argument to parser */
-  char *tokentype;         /* Type of terminal symbols in the parser stack */
-  char *vartype;           /* The default type of non-terminal symbols */
-  char *start;             /* Name of the start symbol for the grammar */
-  char *stacksize;         /* Size of the parser stack */
-  char *include;           /* Code to put at the start of the C file */
-  int  includeln;          /* Line number for start of include code */
-  char *error;             /* Code to execute when an error is seen */
-  int  errorln;            /* Line number for start of error code */
-  char *overflow;          /* Code to execute on a stack overflow */
-  int  overflowln;         /* Line number for start of overflow code */
-  char *failure;           /* Code to execute on parser failure */
-  int  failureln;          /* Line number for start of failure code */
-  char *accept;            /* Code to execute when the parser excepts */
-  int  acceptln;           /* Line number for the start of accept code */
-  char *extracode;         /* Code appended to the generated file */
-  int  extracodeln;        /* Line number for the start of the extra code */
-  char *tokendest;         /* Code to execute to destroy token data */
-  int  tokendestln;        /* Line number for token destroyer code */
-  char *vardest;           /* Code for the default non-terminal destructor */
-  int  vardestln;          /* Line number for default non-term destructor code*/
-  char *filename;          /* Name of the input file */
-  char *outname;           /* Name of the current output file */
-  char *tokenprefix;       /* A prefix added to token names in the .h file */
-  int nconflict;           /* Number of parsing conflicts */
-  int tablesize;           /* Size of the parse tables */
-  int basisflag;           /* Print only basis configurations */
-  int has_fallback;        /* True if any %fallback is seen in the grammer */
-  char *argv0;             /* Name of the program */
+  struct state **sorted;   /* 1  Table of states sorted by state number */
+  struct rule *rule;       /* 2  List of all rules */
+  int nstate;              /* 3  Number of states */
+  int nrule;               /* 4  Number of rules */
+  int nsymbol;             /* 5  Number of terminal and nonterminal symbols */
+  int nterminal;           /* 6  Number of terminal symbols */
+  struct symbol **symbols; /* 7  Sorted array of pointers to symbols */
+  int errorcnt;            /* 8  Number of errors */
+  struct symbol *errsym;   /* 9  The error symbol */
+  char *name;              /* 10 Name of the generated parser */
+  char *arg;               /* 11 Declaration of the 3th argument to parser */
+  char *tokentype;         /* 12 Type of terminal symbols in the parser stack */
+  char *vartype;           /* 13 The default type of non-terminal symbols */
+  char *start;             /* 14 Name of the start symbol for the grammar */
+  char *stacksize;         /* 15 Size of the parser stack */
+  char *include;           /* 16 Code to put at the start of the C file */
+  int  includeln;          /* 17 Line number for start of include code */
+  char *error;             /* 18 Code to execute when an error is seen */
+  int  errorln;            /* 19 Line number for start of error code */
+  char *overflow;          /* 20 Code to execute on a stack overflow */
+  int  overflowln;         /* 21 Line number for start of overflow code */
+  char *failure;           /* 22 Code to execute on parser failure */
+  int  failureln;          /* 23 Line number for start of failure code */
+  char *accept;            /* 24 Code to execute when the parser excepts */
+  int  acceptln;           /* 25 Line number for the start of accept code */
+  char *extracode;         /* 26 Code appended to the generated file */
+  int  extracodeln;        /* 27 Line number for the start of the extra code */
+  char *tokendest;         /* 28 Code to execute to destroy token data */
+  int  tokendestln;        /* 29 Line number for token destroyer code */
+  char *vardest;           /* 30 Code for the default non-terminal destructor */
+  int  vardestln;          /* 31 Line number for default non-term destructor code*/
+  char *filename;          /* 32 Name of the input file */
+  char *outname;           /* 33 Name of the current output file */
+  char *tokenprefix;       /* 34 A prefix added to token names in the .h file */
+  int nconflict;           /* 35 Number of parsing conflicts */
+  int tablesize;           /* 36 Size of the parse tables */
+  int basisflag;           /* 37 Print only basis configurations */
+  int has_fallback;        /* 38 True if any %fallback is seen in the grammer */
+  char *argv0;             /* 39 Name of the program */
 };
 
 #define MemoryCheck(X) if((X)==0){ \
@@ -1319,9 +1319,9 @@ static char **azDefine = 0;  /* Name of the -D macros */
 */
 static void handle_D_option(char *z){
   char **paz;
-  nDefine++;
-  azDefine = realloc(azDefine, sizeof(azDefine[0])*nDefine);
-  if( azDefine==0 ){
+  nDefine++; // realloc先判断当前的指针是否有足够的连续空间,连续空间大小是newsize，如果有，扩大mem_address指向的地址，并且将mem_address返回，如果空间不够，先按照newsize指定的大小分配空间，将原有数据从头到尾拷贝到新分配的内存区域，而后释放原来mem_address所指内存区域（注意：原来指针是自动释放，不需要使用free），同时返回新分配的内存区域的首地址。即重新分配存储器块的地址。
+  azDefine = realloc(azDefine, sizeof(azDefine[0])*nDefine); // realloc原型是extern void *realloc(void *mem_address, unsigned int newsize);
+    if( azDefine==0 ){ // sizeof是计算对象所占的字节数, 因为static char **azDefine = 0; 所以sizeof(azDefine[0])=8,表示8个字节
     fprintf(stderr,"out of memory\n");
     exit(1);
   }
@@ -1333,14 +1333,14 @@ static void handle_D_option(char *z){
   }
   strcpy(*paz, z);
   for(z=*paz; *z && *z!='='; z++){}
-  *z = 0;
+  *z = 0; // 砍掉后面的第二个=, 比如-D=123=12 参数传进来,那么只取得123的值,第二个等号后面的东西忽略
 }
 
 
 /* The main program.  Parse the command line and do it... */
-int main(argc,argv)
-int argc;
-char **argv;
+int main(int argc, char ** argv)
+//int argc;
+//char **argv;
 {
   static int version = 0;
   static int rpflag = 0;
@@ -1362,7 +1362,7 @@ char **argv;
     {OPT_FLAG,0,0,0}
   };
   int i;
-  struct lemon lem;
+  struct lemon lem; // 这个变量 总揽全局。
 
   OptInit(argv,options,stderr);
   if( version ){
@@ -1373,7 +1373,7 @@ char **argv;
     fprintf(stderr,"Exactly one filename argument is required.\n");
     exit(1);
   }
-  lem.errorcnt = 0;
+  lem.errorcnt = 0; // 如果走到这一步,那么什么错误都没有,errorcnt置为0,可以开干了
 
   /* Initialize the machine */
   Strsafe_init();
@@ -1626,18 +1626,18 @@ FILE *err;
 ** Return the index of the N-th non-switch argument.  Return -1
 ** if N is out of range.
 */
-static int argindex(n)
+static int argindex(n) // 很简单。就是拿到非opt参数组的第n个值,在这程序里,只有非opt组只能是y文件的名字,所以参数n只能取值0。n不是0的话,返回都会是-1
 int n;
 {
   int i;
   int dashdash = 0;
   if( argv!=0 && *argv!=0 ){
-    for(i=1; argv[i]; i++){
+    for(i=1; argv[i]; i++){ // argv[0] 是程序的全名,要避开
       if( dashdash || !ISOPT(argv[i]) ){
-        if( n==0 ) return i;
+        if( n==0 ) return i; // 当n=0,表示要取得语法.y文件的全路径名称
         n--;
       }
-      if( strcmp(argv[i],"--")==0 ) dashdash = 1;
+      if( strcmp(argv[i],"--")==0 ) dashdash = 1; // 这是废话、。不可能执行到这里
     }
   }
   return -1;
@@ -1669,8 +1669,8 @@ FILE *err;
     *((int*)op[j].arg) = v; // arg是s_options结构体的第2个属性[下标0开始],代表值
   }else if( op[j].type==OPT_FFLAG ){ // OPT_FFLAG 也没用到,可以忽略
     (*(void(*)())(op[j].arg))(v);
-  }else if( op[j].type==OPT_FSTR ){ // TODO 主要是D参数。。。后面再讨论
-    (*(void(*)())(op[j].arg))(&argv[i][2]);
+  }else if( op[j].type==OPT_FSTR ){ // TODO 主要是D参数。。。后面再讨论.OPT_FSTR类型的s_options结构体的arg是一个函数指针
+    (*(void(*)())(op[j].arg))(&argv[i][2]); // -D123,因为前面一定是"-D",所以用argv[i][0]是'-',argv[i][1]是'D',那么&argv[i][2]就是123的开始位置了
   }else{ // 目前的代码逻辑,应该走不到这一步
     if( err ){
       fprintf(err,"%smissing argument on switch.\n",emsg);
@@ -1763,7 +1763,7 @@ FILE *err;
       case OPT_STR: // TODO,用到了,D参数,以后再看
         *(char**)(op[j].arg) = sv;
         break;
-      case OPT_FSTR: // TODO,用到了,D参数,以后再看 handle_D_option方法
+      case OPT_FSTR: // TODO,用到了,D参数,以后再看 handle_D_option 方法
         (*(void(*)())(op[j].arg))(sv);
         break;
     }
@@ -1819,7 +1819,7 @@ int n;
   return i>=0 ? argv[i] : 0;
 }
 
-void OptErr(n)
+void OptErr(n) // 这个函数没用到过。。
 int n;
 {
   int i;
@@ -3960,27 +3960,27 @@ struct s_x1 {
 typedef struct s_x1node {
   char *data;                  /* The data */
   struct s_x1node *next;   /* Next entry with the same hash */
-  struct s_x1node **from;  /* Previous link */
+  struct s_x1node **from;  /* Previous link */ //TODO 二级指针,跟next有区别,后面再讨论
 } x1node;
 
 /* There is only one instance of the array, which is the following */
-static struct s_x1 *x1a;
+static struct s_x1 *x1a; // 这是一个数组,整个LEMON程序只有这一个数组。 装备字符串之用x1a
 
 /* Allocate a new associative array */
 void Strsafe_init(){
   if( x1a ) return;
   x1a = (struct s_x1*)malloc( sizeof(struct s_x1) );
   if( x1a ){
-    x1a->size = 1024;
+    x1a->size = 1024; // 2的指数幂
     x1a->count = 0;
-    x1a->tbl = (x1node*)malloc( 
-      (sizeof(x1node) + sizeof(x1node*))*1024 );
+    x1a->tbl = (x1node*)malloc( // sizeof(x1node)=24个字节 sizeof(x1node*)=8个字节。一般C语言一个指针就是4个字节=32bits,但是 在MAC64位机器上就是8个字节=64bits。 也就是8个char,在c语言中,一个char就是一个byte
+      (sizeof(x1node) + sizeof(x1node*))*1024 );// √TODO 为什么是(sizeof(x1node) + sizeof(x1node*))*1024 而不是 (sizeof(x1node))*1024? 要结合下面的代码来理解x1a->ht
     if( x1a->tbl==0 ){
       free(x1a);
       x1a = 0;
     }else{
       int i;
-      x1a->ht = (x1node**)&(x1a->tbl[1024]);
+      x1a->ht = (x1node**)&(x1a->tbl[1024]); // ht 是二级指针,所以指向还是指针。x1a->tbl 不仅申请了1024个sizeof(x1node),分别是x1a->tbl[0]到x1a->tbl[1023]。还申请了1024个sizeof(x1node*),这样从x1a->tbl[1024]就是x1a->ht 的首地址了,再依次初始化后面的1023个指针
       for(i=0; i<1024; i++) x1a->ht[i] = 0;
     }
   }
@@ -4136,7 +4136,7 @@ void Symbol_init(){
     x2a->size = 128;
     x2a->count = 0;
     x2a->tbl = (x2node*)malloc( 
-      (sizeof(x2node) + sizeof(x2node*))*128 );
+      (sizeof(x2node) + sizeof(x2node*))*128 ); // TODO 疑问同x1a
     if( x2a->tbl==0 ){
       free(x2a);
       x2a = 0;
