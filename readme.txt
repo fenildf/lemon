@@ -13,4 +13,4 @@ lemon.c 跟 lempar.c是从sqlite-3.1.2.tar.gz 代码中取得的。
 
 2、./lemon example4.y -c  #得到example4.cpp、example4.h、example4.out三个文件
 
-3、剩下CMakeLists.txt文件
+3、剩下看CMakeLists.txt文件

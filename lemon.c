@@ -1352,7 +1352,7 @@ char **argv;
   static struct s_options options[] = {
     {OPT_FLAG, "b", (char*)&basisflag, "Print only the basis in report."},
     {OPT_FLAG, "c", (char*)&compress, "Don't compress the action table."},
-    {OPT_FSTR, "D", (char*)handle_D_option, "Define an %ifdef macro."},
+    {OPT_FSTR, "D", (char*)handle_D_option, "Define an %ifdef macro."}, // handle_D_option 说明看书籍<LEMON语法分析生成器>第100页
     {OPT_FLAG, "g", (char*)&rpflag, "Print grammar without actions."},
     {OPT_FLAG, "m", (char*)&mhflag, "Output a makeheaders compatible file"},
     {OPT_FLAG, "q", (char*)&quiet, "(Quiet) Don't print the report file."},
@@ -1600,18 +1600,18 @@ static FILE *errstream;
 ** Print the command line with a carrot pointing to the k-th character
 ** of the n-th field.
 */
-static void errline(n,k,err)
+static void errline(n,k,err) // n是那些带着"+"或者"-"开头的参数的位置
 int n;
 int k;
 FILE *err;
 {
   int spcnt, i;
   spcnt = 0;
-  if( argv[0] ) fprintf(err,"%s",argv[0]);
+  if( argv[0] ) fprintf(err,"%s",argv[0]); // 打印第0个参数,就是程序的全名
   spcnt = strlen(argv[0]) + 1;
   for(i=1; i<n && argv[i]; i++){
     fprintf(err," %s",argv[i]);
-    spcnt += strlen(argv[i]+1);
+    spcnt += strlen(argv[i])+1; // 原来的代码是spcnt += strlen(argv[i]+1); 这明显是一个bug. 在3.2.2 中已经得到修复了。本代码是3.1.2,所以还是一个bug
   }
   spcnt += k;
   for(; argv[i]; i++) fprintf(err," %s",argv[i]);
@@ -1648,7 +1648,7 @@ static char emsg[] = "Command line syntax error: ";
 /*
 ** Process a flag command line argument.
 */
-static int handleflags(i,err)
+static int handleflags(i,err) // i是那些带着"+"或者"-"开头的参数的位置
 int i;
 FILE *err;
 {
@@ -1656,22 +1656,22 @@ FILE *err;
   int errcnt = 0;
   int j;
   for(j=0; op[j].label; j++){
-    if( strncmp(&argv[i][1],op[j].label,strlen(op[j].label))==0 ) break;
+    if( strncmp(&argv[i][1],op[j].label,strlen(op[j].label))==0 ) break; // strncmp(const char * str1, const char * str2, size_t n)函数,若str1与str2的前n个字符相同，则返回0；若s1大于s2，则返回大于0的值；若s1 若小于s2，则返回小于0的值。
   }
   v = argv[i][0]=='-' ? 1 : 0;
-  if( op[j].label==0 ){
-    if( err ){
+  if( op[j].label==0 ){ // label 是第1个属性[下标0开始],那些b c g m
+    if( err ){ // 如果一直找不到对应的属性[b c g m q s x], 那么最后的op[j]就是 {OPT_FLAG,0,0,0}, 那么就报错了
       fprintf(err,"%sundefined option.\n",emsg);
       errline(i,1,err);
     }
     errcnt++;
-  }else if( op[j].type==OPT_FLAG ){
-    *((int*)op[j].arg) = v;
-  }else if( op[j].type==OPT_FFLAG ){
+  }else if( op[j].type==OPT_FLAG ){ //  OPT_FLAG 用到, '-'开头就是1,表示打开。'+'开头就是0,表示关闭
+    *((int*)op[j].arg) = v; // arg是s_options结构体的第2个属性[下标0开始],代表值
+  }else if( op[j].type==OPT_FFLAG ){ // OPT_FFLAG 也没用到,可以忽略
     (*(void(*)())(op[j].arg))(v);
-  }else if( op[j].type==OPT_FSTR ){
+  }else if( op[j].type==OPT_FSTR ){ // TODO 主要是D参数。。。后面再讨论
     (*(void(*)())(op[j].arg))(&argv[i][2]);
-  }else{
+  }else{ // 目前的代码逻辑,应该走不到这一步
     if( err ){
       fprintf(err,"%smissing argument on switch.\n",emsg);
       errline(i,1,err);
@@ -1695,15 +1695,15 @@ FILE *err;
   int j;
   int errcnt = 0;
   cp = strchr(argv[i],'=');
-  *cp = 0;
+  *cp = 0; // 由于把'=' 改成 '\0',这样可以 使用strcmp 直接对比 等号前面的key 字符串
   for(j=0; op[j].label; j++){
     if( strcmp(argv[i],op[j].label)==0 ) break;
   }
-  *cp = '=';
+  *cp = '='; // 比较完了之后,回复老样子
   if( op[j].label==0 ){
-    if( err ){
+    if( err ){ // 逻辑同handleflags,如果一直找不到对应的属性[b c g m q s x], 那么最后的op[j]就是 {OPT_FLAG,0,0,0}, 那么就报错了
       fprintf(err,"%sundefined option.\n",emsg);
-      errline(i,0,err);
+      errline(i,0,err);  // 为什么参数是0,而handleflags函数的errline参数是1. 因为这里的D参数前面没有中划线。而handleflags函数的-b -m -g 参数,前面有个中划线。所以报错指明的"^-- here"标志的时候有所不同
     }
     errcnt++;
   }else{
@@ -1711,14 +1711,14 @@ FILE *err;
     switch( op[j].type ){
       case OPT_FLAG:
       case OPT_FFLAG:
-        if( err ){
+        if( err ){ // flag参数,应该是-c这样,不要c=xxx这样
           fprintf(err,"%soption requires an argument.\n",emsg);
           errline(i,0,err);
         }
         errcnt++;
         break;
       case OPT_DBL:
-      case OPT_FDBL:
+      case OPT_FDBL: // 目前没用到,忽略
         dv = strtod(cp,&end);
         if( *end ){
           if( err ){
@@ -1729,7 +1729,7 @@ FILE *err;
         }
         break;
       case OPT_INT:
-      case OPT_FINT:
+      case OPT_FINT: // 目前没用到,忽略
         lv = strtol(cp,&end,0);
         if( *end ){
           if( err ){
@@ -1740,7 +1740,7 @@ FILE *err;
         }
         break;
       case OPT_STR:
-      case OPT_FSTR:
+      case OPT_FSTR: // TODO 用到了,D参数,以后再看 。 cp指针指向 参数等号 后面的一个字符,比如./lemon D=123,那么cp就指向1的位置
         sv = cp;
         break;
     }
@@ -1748,22 +1748,22 @@ FILE *err;
       case OPT_FLAG:
       case OPT_FFLAG:
         break;
-      case OPT_DBL:
+      case OPT_DBL: // 忽略,目前sqlite版本暂时没用到
         *(double*)(op[j].arg) = dv;
         break;
-      case OPT_FDBL:
+      case OPT_FDBL: // 忽略,目前sqlite版本暂时没用到
         (*(void(*)())(op[j].arg))(dv);
         break;
-      case OPT_INT:
+      case OPT_INT: // 忽略,目前sqlite版本暂时没用到
         *(int*)(op[j].arg) = lv;
         break;
-      case OPT_FINT:
+      case OPT_FINT: // 忽略,目前sqlite版本暂时没用到
         (*(void(*)())(op[j].arg))((int)lv);
         break;
-      case OPT_STR:
+      case OPT_STR: // TODO,用到了,D参数,以后再看
         *(char**)(op[j].arg) = sv;
         break;
-      case OPT_FSTR:
+      case OPT_FSTR: // TODO,用到了,D参数,以后再看 handle_D_option方法
         (*(void(*)())(op[j].arg))(sv);
         break;
     }
@@ -1782,11 +1782,11 @@ FILE *err;
   errstream = err;
   if( argv && *argv && op ){
     int i;
-    for(i=1; argv[i]; i++){
+    for(i=1; argv[i]; i++){ // argc是命令行总的参数个数,argv[]是argc个参数,其中第0个参数是程序的全名。 所以argv[0]到argv[argc-1]有值,而argv[argc]是NULL
       if( argv[i][0]=='+' || argv[i][0]=='-' ){
         errcnt += handleflags(i,err);
-      }else if( strchr(argv[i],'=') ){
-        errcnt += handleswitch(i,err);
+      }else if( strchr(argv[i],'=') ){ // strchr 寻找等号的 指针位置,找不到就返回NULL,NULL在实际的底层代码中就是0。
+          errcnt += handleswitch(i,err);
       }
     }
   }
@@ -1803,12 +1803,12 @@ int OptNArgs(){
   int dashdash = 0;
   int i;
   if( argv!=0 && argv[0]!=0 ){
-    for(i=1; argv[i]; i++){
-      if( dashdash || !ISOPT(argv[i]) ) cnt++;
-      if( strcmp(argv[i],"--")==0 ) dashdash = 1;
+    for(i=1; argv[i]; i++){ // gcc中,main函数进来的argv参数组,能保证最后一个NULL的地址一定是0x00
+      if( dashdash || !ISOPT(argv[i]) ) cnt++; // 不是opt的话,就当成是传进来的file路径
+      if( strcmp(argv[i],"--")==0 ) dashdash = 1; //strcmp 比较两个字符串..这里感觉没有毛用,因为'--'一定死在前面的OptInit,走不到这一步
     }
   }
-  return cnt;
+  return cnt; // 只允许一个filename,所以这里的cnt不是1 ,就报错了
 }
 
 char *OptArg(n)
@@ -1831,9 +1831,9 @@ void OptPrint(){
   int i;
   int max, len;
   max = 0;
-  for(i=0; op[i].label; i++){
+  for(i=0; op[i].label; i++){ // label 是第1个属性[下标0开始]
     len = strlen(op[i].label) + 1;
-    switch( op[i].type ){
+    switch( op[i].type ){ // type 是第0个属性
       case OPT_FLAG:
       case OPT_FFLAG:
         break;
@@ -1850,7 +1850,7 @@ void OptPrint(){
         len += 8;       /* length of "<string>" */
         break;
     }
-    if( len>max ) max = len;
+    if( len>max ) max = len; // 得到长度最大的值,以方便打印整齐的提示信息
   }
   for(i=0; op[i].label; i++){
     switch( op[i].type ){
