@@ -1257,30 +1257,30 @@ int max;
 ** splits occur at a space, if there is a space available near the end
 ** of the line.
 */
-#define ERRMSGSIZE  10000 /* Hope this is big enough.  No way to error check */
-#define LINEWIDTH      79 /* Max width of any output line */
-#define PREFIXLIMIT    30 /* Max width of the prefix on each line */
-void ErrorMsg(const char *filename, int lineno, const char *format, ...){
+#define ERRMSGSIZE  10000 /* Hope this is big enough.  No way to error check */ // 出错字符串的最大字节数
+#define LINEWIDTH      79 /* Max width of any output line */ // 输出到屏幕上一行内容的最大宽度
+#define PREFIXLIMIT    30 /* Max width of the prefix on each line */ // 定义在屏幕上输出一行内容时候,可加的前缀字符数量
+void ErrorMsg(const char *filename, int lineno, const char *format, ...){ // format 是参数格式
   char errmsg[ERRMSGSIZE];
   char prefix[PREFIXLIMIT+10];
   int errmsgsize;
   int prefixsize;
   int availablewidth;
-  va_list ap;
+  va_list ap; // variable list可变化的列表,处理一个va_list 需要va_start va_arg(可选) va_end vsprintf四个函数一起用
   int end, restart, base;
 
   va_start(ap, format);
   /* Prepare a prefix to be prepended to every output line */
-  if( lineno>0 ){
+  if( lineno>0 ){ // 如果lineno大于0,说明已经开始处理y文件的实质内容了,这时候y文件出错的行号也要打印出来。
     sprintf(prefix,"%.*s:%d: ",PREFIXLIMIT-10,filename,lineno);
-  }else{
+  }else{ // 当lineno等于0的时候,说明还没搞到y文件,这是只打印文件名称即可,不用打印文件出错的行号
     sprintf(prefix,"%.*s: ",PREFIXLIMIT-10,filename);
   }
   prefixsize = strlen(prefix);
-  availablewidth = LINEWIDTH - prefixsize;
+  availablewidth = LINEWIDTH - prefixsize; // 最大宽度-减去-可用前缀的最大宽度
 
   /* Generate the error message */
-  vsprintf(errmsg,format,ap);
+  vsprintf(errmsg,format,ap); // int vsprintf(char *string, char *format, va_list param);//将param 按格式format写入字符串string中
   va_end(ap);
   errmsgsize = strlen(errmsg);
   /* Remove trailing '\n's from the error message. */
@@ -1291,7 +1291,7 @@ void ErrorMsg(const char *filename, int lineno, const char *format, ...){
   /* Print the error message */
   base = 0;
   while( errmsg[base]!=0 ){
-    end = restart = findbreak(&errmsg[base],0,availablewidth);
+    end = restart = findbreak(&errmsg[base],0,availablewidth); // findbreak既能让字符串的长度至少有大于min个字符的绝对不多于max个字符,并且让分行得到的字符串的长度尽量达到max
     restart += base;
     while( errmsg[restart]==' ' ) restart++;
     fprintf(stdout,"%s%.*s\n",prefix,end,&errmsg[base]);
@@ -1395,14 +1395,14 @@ int main(int argc, char ** argv)
   lem.errsym = Symbol_new("error");
 
   /* Parse the input file */
-  Parse(&lem);
+  Parse(&lem); // ※※※LEMON作者说了很多遍,很多遍了,是这个名字虽然叫做parse,但其实他不是语法分析器parser,他是一个词法分析器lexer。。※※※
   if( lem.errorcnt ) exit(lem.errorcnt);
   if( lem.rule==0 ){
     fprintf(stderr,"Empty grammar.\n");
     exit(1);
   }
 
-  /* Count and index the symbols of the grammar */
+  /* Count and index the symbols of the grammar */ // 下面 是一个计算 x2a 终结符 非终结符 的个数。 值得看的是qsort算法
   lem.nsymbol = Symbol_count();
   Symbol_new("{default}");
   lem.symbols = Symbol_arrayof();
@@ -1414,9 +1414,9 @@ int main(int argc, char ** argv)
   lem.nterminal = i;
 
   /* Generate a reprint of the grammar, if requested on the command line */
-  if( rpflag ){
+  if( rpflag ){ // 这个参数 是命令行传进来的,-g
     Reprint(&lem);
-  }else{
+  }else{ // TODO 重头戏来了。。。。first集。。。看完前五章,懂了 lexer的实现,下面才是真正的parser的实现了。
     /* Initialize the size for all follow and first sets */
     SetSize(lem.nterminal);
 
@@ -1883,11 +1883,11 @@ void OptPrint(){
 
 /* The state of the parser */
 struct pstate {
-  char *filename;       /* Name of the input file */
-  int tokenlineno;      /* Linenumber at which current token starts */
+  char *filename;       /* Name of the input file */  // 语法文件的名字
+  int tokenlineno;      /* Linenumber at which current token starts */ // 当前正在分析的符号的位置
   int errorcnt;         /* Number of errors so far */
   char *tokenstart;     /* Text of current token */
-  struct lemon *gp;     /* Global state vector */
+  struct lemon *gp;     /* Global state vector */  // 就是那个全局变量 lemon
   enum e_state {
     INITIALIZE,
     WAITING_FOR_DECL_OR_RULE,
@@ -1910,10 +1910,10 @@ struct pstate {
     WAITING_FOR_FALLBACK_ID
   } state;                   /* The state of the parser */
   struct symbol *fallback;   /* The fallback token */
-  struct symbol *lhs;        /* Left-hand side of current rule */
+  struct symbol *lhs;        /* Left-hand side of current rule */ // 左边文法符号,是一个非终结符
   char *lhsalias;            /* Alias for the LHS */
   int nrhs;                  /* Number of right-hand side symbols seen */
-  struct symbol *rhs[MAXRHS];  /* RHS symbols */
+  struct symbol *rhs[MAXRHS];  /* RHS symbols */ // 右边文法符号的数组,最大值 不能超过1000
   char *alias[MAXRHS];       /* Aliases for each RHS symbol (or NULL) */
   struct rule *prevrule;     /* Previous rule parsed */
   char *declkeyword;         /* Keyword of a declaration */
@@ -1930,22 +1930,22 @@ static void parseonetoken(psp)
 struct pstate *psp;
 {
   char *x;
-  x = Strsafe(psp->tokenstart);     /* Save the token permanently */
+  x = Strsafe(psp->tokenstart);     /* Save the token permanently */ // x1a 主要是拿来存字符串, 一段一段存
 #if 0
   printf("%s:%d: Token=[%s] state=%d\n",psp->filename,psp->tokenlineno,
     x,psp->state);
 #endif
-  switch( psp->state ){
+  switch( psp->state ){ // 一共有19个case
     case INITIALIZE:
       psp->prevrule = 0;
       psp->preccounter = 0;
       psp->firstrule = psp->lastrule = 0;
       psp->gp->nrule = 0;
-      /* Fall thru to next case */
+      /* Fall thru to next case */ // 注意此处没有break,所以会往下走
     case WAITING_FOR_DECL_OR_RULE:
       if( x[0]=='%' ){
-        psp->state = WAITING_FOR_DECL_KEYWORD;
-      }else if( islower(x[0]) ){
+        psp->state = WAITING_FOR_DECL_KEYWORD; // %开头的话,下一个状态就是描述的keyword
+      }else if( islower(x[0]) ){ // lower的话就是 非终结符的开始
         psp->lhs = Symbol_new(x);
         psp->nrhs = 0;
         psp->lhsalias = 0;
@@ -2132,35 +2132,35 @@ to follow the previous rule.");
         psp->declkeyword = x;
         psp->declargslot = 0;
         psp->decllnslot = 0;
-        psp->state = WAITING_FOR_DECL_ARG;
+        psp->state = WAITING_FOR_DECL_ARG; // WAITING_FOR_DECL_KEYWORD的下一个状态就是 arg参数了
         if( strcmp(x,"name")==0 ){
           psp->declargslot = &(psp->gp->name);
-	}else if( strcmp(x,"include")==0 ){
-          psp->declargslot = &(psp->gp->include);
-          psp->decllnslot = &psp->gp->includeln;
-	}else if( strcmp(x,"code")==0 ){
-          psp->declargslot = &(psp->gp->extracode);
-          psp->decllnslot = &psp->gp->extracodeln;
-	}else if( strcmp(x,"token_destructor")==0 ){
-          psp->declargslot = &psp->gp->tokendest;
-          psp->decllnslot = &psp->gp->tokendestln;
-	}else if( strcmp(x,"default_destructor")==0 ){
-          psp->declargslot = &psp->gp->vardest;
-          psp->decllnslot = &psp->gp->vardestln;
-	}else if( strcmp(x,"token_prefix")==0 ){
-          psp->declargslot = &psp->gp->tokenprefix;
-	}else if( strcmp(x,"syntax_error")==0 ){
-          psp->declargslot = &(psp->gp->error);
-          psp->decllnslot = &psp->gp->errorln;
-	}else if( strcmp(x,"parse_accept")==0 ){
-          psp->declargslot = &(psp->gp->accept);
-          psp->decllnslot = &psp->gp->acceptln;
-	}else if( strcmp(x,"parse_failure")==0 ){
-          psp->declargslot = &(psp->gp->failure);
-          psp->decllnslot = &psp->gp->failureln;
-	}else if( strcmp(x,"stack_overflow")==0 ){
-          psp->declargslot = &(psp->gp->overflow);
-          psp->decllnslot = &psp->gp->overflowln;
+        }else if( strcmp(x,"include")==0 ){
+              psp->declargslot = &(psp->gp->include);
+              psp->decllnslot = &psp->gp->includeln;
+        }else if( strcmp(x,"code")==0 ){
+              psp->declargslot = &(psp->gp->extracode);
+              psp->decllnslot = &psp->gp->extracodeln;
+        }else if( strcmp(x,"token_destructor")==0 ){
+              psp->declargslot = &psp->gp->tokendest;
+              psp->decllnslot = &psp->gp->tokendestln;
+        }else if( strcmp(x,"default_destructor")==0 ){
+              psp->declargslot = &psp->gp->vardest;
+              psp->decllnslot = &psp->gp->vardestln;
+        }else if( strcmp(x,"token_prefix")==0 ){
+              psp->declargslot = &psp->gp->tokenprefix;
+        }else if( strcmp(x,"syntax_error")==0 ){
+              psp->declargslot = &(psp->gp->error);
+              psp->decllnslot = &psp->gp->errorln;
+        }else if( strcmp(x,"parse_accept")==0 ){
+              psp->declargslot = &(psp->gp->accept);
+              psp->decllnslot = &psp->gp->acceptln;
+        }else if( strcmp(x,"parse_failure")==0 ){
+              psp->declargslot = &(psp->gp->failure);
+              psp->decllnslot = &psp->gp->failureln;
+        }else if( strcmp(x,"stack_overflow")==0 ){
+              psp->declargslot = &(psp->gp->overflow);
+              psp->decllnslot = &psp->gp->overflowln;
         }else if( strcmp(x,"extra_argument")==0 ){
           psp->declargslot = &(psp->gp->arg);
         }else if( strcmp(x,"token_type")==0 ){
@@ -2174,7 +2174,7 @@ to follow the previous rule.");
         }else if( strcmp(x,"left")==0 ){
           psp->preccounter++;
           psp->declassoc = LEFT;
-          psp->state = WAITING_FOR_PRECEDENCE_SYMBOL;
+          psp->state = WAITING_FOR_PRECEDENCE_SYMBOL; // 找到了left关键字,那么下一个状态就是想找优先符了。
         }else if( strcmp(x,"right")==0 ){
           psp->preccounter++;
           psp->declassoc = RIGHT;
@@ -2183,9 +2183,9 @@ to follow the previous rule.");
           psp->preccounter++;
           psp->declassoc = NONE;
           psp->state = WAITING_FOR_PRECEDENCE_SYMBOL;
-	}else if( strcmp(x,"destructor")==0 ){
+	    }else if( strcmp(x,"destructor")==0 ){
           psp->state = WAITING_FOR_DESTRUCTOR_SYMBOL;
-	}else if( strcmp(x,"type")==0 ){
+	    }else if( strcmp(x,"type")==0 ){
           psp->state = WAITING_FOR_DATATYPE_SYMBOL;
         }else if( strcmp(x,"fallback")==0 ){
           psp->fallback = 0;
@@ -2195,7 +2195,7 @@ to follow the previous rule.");
             "Unknown declaration keyword: \"%%%s\".",x);
           psp->errorcnt++;
           psp->state = RESYNC_AFTER_DECL_ERROR;
-	}
+	    }
       }else{
         ErrorMsg(psp->filename,psp->tokenlineno,
           "Illegal declaration keyword: \"%s\".",x);
@@ -2231,10 +2231,10 @@ to follow the previous rule.");
       break;
     case WAITING_FOR_PRECEDENCE_SYMBOL:
       if( x[0]=='.' ){
-        psp->state = WAITING_FOR_DECL_OR_RULE;
+        psp->state = WAITING_FOR_DECL_OR_RULE; // 如果出现小黑点了,那么就代表结束了。下一个状态就是寻找 特殊声明符 或者 产生式了
       }else if( isupper(x[0]) ){
         struct symbol *sp;
-        sp = Symbol_new(x);
+        sp = Symbol_new(x); // 大写的话就是终结符,开始写入 Symbol结构体,这个结构体的 全局变量就是x2a.. x2a 可以存放终结符或者非终结符。。此处没有出现小黑点,所以下个状态还是寻找优先符
         if( sp->prec>=0 ){
           ErrorMsg(psp->filename,psp->tokenlineno,
             "Symbol \"%s\" has already be given a precedence.",x);
@@ -2249,7 +2249,7 @@ to follow the previous rule.");
         psp->errorcnt++;
       }
       break;
-    case WAITING_FOR_DECL_ARG:
+    case WAITING_FOR_DECL_ARG: // DECL 代表 特殊声明符
       if( (x[0]=='{' || x[0]=='\"' || isalnum(x[0])) ){
         if( *(psp->declargslot)!=0 ){
           ErrorMsg(psp->filename,psp->tokenlineno,
@@ -2257,11 +2257,11 @@ to follow the previous rule.");
             x[0]=='\"' ? &x[1] : x,psp->declkeyword);
           psp->errorcnt++;
           psp->state = RESYNC_AFTER_DECL_ERROR;
-	}else{
-          *(psp->declargslot) = (x[0]=='\"' || x[0]=='{') ? &x[1] : x;
-          if( psp->decllnslot ) *psp->decllnslot = psp->tokenlineno;
-          psp->state = WAITING_FOR_DECL_OR_RULE;
-	}
+        }else{
+              *(psp->declargslot) = (x[0]=='\"' || x[0]=='{') ? &x[1] : x;
+              if( psp->decllnslot ) *psp->decllnslot = psp->tokenlineno;
+              psp->state = WAITING_FOR_DECL_OR_RULE; // WAITING_FOR_DECL_ARG的参数拿完了之后,那下一个期待状态就是 特殊声明符或者产生式
+        }
       }else{
         ErrorMsg(psp->filename,psp->tokenlineno,
           "Illegal argument to %%%s: %s",psp->declkeyword,x);
@@ -2305,19 +2305,19 @@ to follow the previous rule.");
 ** macros.  This routine looks for "%ifdef" and "%ifndef" and "%endif" and
 ** comments them out.  Text in between is also commented out as appropriate.
 */
-static void preprocess_input(char *z){
+static void preprocess_input(char *z){ // 处理预编译 代码%ifdef-%endif
   int i, j, k, n;
   int exclude = 0;
   int start;
   int lineno = 1;
   int start_lineno;
   for(i=0; z[i]; i++){
-    if( z[i]=='\n' ) lineno++;
-    if( z[i]!='%' || (i>0 && z[i-1]!='\n') ) continue;
-    if( strncmp(&z[i],"%endif",6)==0 && isspace(z[i+6]) ){
-      if( exclude ){
+    if( z[i]=='\n' ) lineno++; // 遇到换行,那就lineno加1
+    if( z[i]!='%' || (i>0 && z[i-1]!='\n') ) continue; // (i>0 && z[i-1]!='\n') 表示的意思是:即使当前字符是%,那么要求%的前面是回车,不然忽略
+    if( strncmp(&z[i],"%endif",6)==0 && isspace(z[i+6]) ){ // int strncmp ( const char * str1, const char * str2, size_t n );参数】str1, str2 为需要比较的两个字符串，n为要比较的字符的数目。
+      if( exclude ){ // isspace 空格(' ')、水平定位字符('\t')、归位键('\r')、换行('\n')、垂直定位字符('\v')或翻页('\f'),说白了,%endif后面必须是空格字符
         exclude--;
-        if( exclude==0 ){
+        if( exclude==0 ){ // 如果置零了,说明 即使存在的%ifdef %ifdef-%endif %endif这种嵌套 也结束了。开始 开删了。。
           for(j=start; j<i; j++) if( z[j]!='\n' ) z[j] = ' ';
         }
       }
@@ -2325,27 +2325,27 @@ static void preprocess_input(char *z){
     }else if( (strncmp(&z[i],"%ifdef",6)==0 && isspace(z[i+6]))
           || (strncmp(&z[i],"%ifndef",7)==0 && isspace(z[i+7])) ){
       if( exclude ){
-        exclude++;
+        exclude++; // 排除个数+1
       }else{
-        for(j=i+7; isspace(z[j]); j++){}
-        for(n=0; z[j+n] && !isspace(z[j+n]); n++){}
+        for(j=i+7; isspace(z[j]); j++){} // 跨越所有的空格 比如%ifdef      first这样,忽略中间所有的空格
+        for(n=0; z[j+n] && !isspace(z[j+n]); n++){} // 跨越空格 之后的那个值的所有非空格 比如%ifdef      first这样, 得到first整个单词的长度值n
         exclude = 1;
-        for(k=0; k<nDefine; k++){
-          if( strncmp(azDefine[k],&z[j],n)==0 && strlen(azDefine[k])==n ){
+        for(k=0; k<nDefine; k++){ // nDefine就是那个 从命令行参数 传进来的那些D参数的 总个数
+          if( strncmp(azDefine[k],&z[j],n)==0 && strlen(azDefine[k])==n ){ // 如果这货 已经存在 D参数列表里面了的话,就跳出循环。 那么排除个数exclude就置为0
             exclude = 0;
             break;
           }
         }
-        if( z[i+3]=='n' ) exclude = !exclude;
-        if( exclude ){
+        if( z[i+3]=='n' ) exclude = !exclude; //1.1 属于%ifndef的话, 并且D参数没有这货,那么 exclude 此时的值是0,表示不用排除这代码. 1.2 属于%ifndef的话, 并且D参数有这货,那么 exclude 此时的值是1,那得排除这段代码
+        if( exclude ){ // 开始干掉代码了,设置 干掉代码的起点。。等下次 遇到%endif 就开始全部置空格
           start = i;
           start_lineno = lineno;
         }
       }
-      for(j=i; z[j] && z[j]!='\n'; j++) z[j] = ' ';
+      for(j=i; z[j] && z[j]!='\n'; j++) z[j] = ' '; // %ifndef 或者 %ifdef 虽然后面是空格,但是在同一行中还有其他东西的东西,比如"%ifdef 123 234"之类的,把后面的"123 234"删除
     }
   }
-  if( exclude ){
+  if( exclude ){ // 如果exclude 不为0, 说明%ifdef有头无尾
     fprintf(stderr,"unterminated %%ifdef starting on line %d\n", start_lineno);
     exit(1);
   }
@@ -2356,7 +2356,7 @@ static void preprocess_input(char *z){
 ** token is passed to the function "parseonetoken" which builds all
 ** the appropriate data structures in the global state vector "gp".
 */
-void Parse(gp)
+void Parse(gp) // 理解成scanner 或者 lexer 。。。其实准确说,他不是一个Parser,这点要注意
 struct lemon *gp;
 {
   struct pstate ps;
@@ -2380,17 +2380,17 @@ struct lemon *gp;
     gp->errorcnt++;
     return;
   }
-  fseek(fp,0,2);
-  filesize = ftell(fp);
-  rewind(fp);
-  filebuf = (char *)malloc( filesize+1 );
+  fseek(fp,0,2); //指向文件尾巴。 int fseek(FILE *stream, long offset, int fromwhere); 如果执行成功，指针将指向以fromwhere【偏移起始位置：文件头0(SEEK_SET)，当前位置1(SEEK_CUR)，文件尾2(SEEK_END)】为基准，偏移offset（指针偏移量）个字节的位置。
+  filesize = ftell(fp); // 函数 ftell 用于得到文件位置指针当前位置相对于文件首的偏移字节数
+  rewind(fp); // 功能是将文件内部的指针重新指向一个流的开头,滚回头部
+  filebuf = (char *)malloc( filesize+1 ); // 多申请一个字节,最后一个字节用来放 '\0'
   if( filebuf==0 ){
     ErrorMsg(ps.filename,0,"Can't allocate %d of memory to hold this file.",
       filesize+1);
     gp->errorcnt++;
     return;
   }
-  if( fread(filebuf,1,filesize,fp)!=filesize ){
+  if( fread(filebuf,1,filesize,fp)!=filesize ){ // 读取整个文件
     ErrorMsg(ps.filename,0,"Can't read in all %d bytes of this file.",
       filesize);
     free(filebuf);
@@ -2401,19 +2401,19 @@ struct lemon *gp;
   filebuf[filesize] = 0;
 
   /* Make an initial pass through the file to handle %ifdef and %ifndef */
-  preprocess_input(filebuf);
+  preprocess_input(filebuf); // 处理 %ifdef and %ifndef */ 的那些内容
 
   /* Now scan the text of the input file */
   lineno = 1;
   for(cp=filebuf; (c= *cp)!=0; ){
     if( c=='\n' ) lineno++;              /* Keep track of the line number */
     if( isspace(c) ){ cp++; continue; }  /* Skip all white space */
-    if( c=='/' && cp[1]=='/' ){          /* Skip C++ style comments */
+    if( c=='/' && cp[1]=='/' ){          /* Skip C++ style comments */ // 忽略// 注释
       cp+=2;
       while( (c= *cp)!=0 && c!='\n' ) cp++;
       continue;
     }
-    if( c=='/' && cp[1]=='*' ){          /* Skip C style comments */
+    if( c=='/' && cp[1]=='*' ){          /* Skip C style comments */ // 忽略/* */ 注释
       cp+=2;
       while( (c= *cp)!=0 && (c!='/' || cp[-1]!='*') ){
         if( c=='\n' ) lineno++;
@@ -2422,7 +2422,7 @@ struct lemon *gp;
       if( c ) cp++;
       continue;
     }
-    ps.tokenstart = cp;                /* Mark the beginning of the token */
+    ps.tokenstart = cp;                /* Mark the beginning of the token */ // ps 就是一个pstate,词法分析的专有数据结构
     ps.tokenlineno = lineno;           /* Linenumber on which token begins */
     if( c=='\"' ){                     /* String literals */
       cp++;
@@ -2432,42 +2432,42 @@ struct lemon *gp;
       }
       if( c==0 ){
         ErrorMsg(ps.filename,startline,
-"String starting on this line is not terminated before the end of the file.");
+"String starting on this line is not terminated before the end of the file."); // 没有找到右引号,就结束了。fxxk,string没有右边双引号
         ps.errorcnt++;
         nextcp = cp;
       }else{
         nextcp = cp+1;
       }
-    }else if( c=='{' ){               /* A block of C code */
+    }else if( c=='{' ){               /* A block of C code */// 识别出 代码
       int level;
       cp++;
-      for(level=1; (c= *cp)!=0 && (level>1 || c!='}'); cp++){
-        if( c=='\n' ) lineno++;
-        else if( c=='{' ) level++;
-        else if( c=='}' ) level--;
-        else if( c=='/' && cp[1]=='*' ){  /* Skip comments */
-          int prevc;
-          cp = &cp[2];
-          prevc = 0;
-          while( (c= *cp)!=0 && (c!='/' || prevc!='*') ){
+        for(level=1; (c= *cp)!=0 && (level>1 || c!='}'); cp++){
             if( c=='\n' ) lineno++;
-            prevc = c;
-            cp++;
-	  }
-	}else if( c=='/' && cp[1]=='/' ){  /* Skip C++ style comments too */
-          cp = &cp[2];
-          while( (c= *cp)!=0 && c!='\n' ) cp++;
-          if( c ) lineno++;
-	}else if( c=='\'' || c=='\"' ){    /* String a character literals */
-          int startchar, prevc;
-          startchar = c;
-          prevc = 0;
-          for(cp++; (c= *cp)!=0 && (c!=startchar || prevc=='\\'); cp++){
-            if( c=='\n' ) lineno++;
-            if( prevc=='\\' ) prevc = 0;
-            else              prevc = c;
-	  }
-	}
+            else if( c=='{' ) level++;
+            else if( c=='}' ) level--;
+            else if( c=='/' && cp[1]=='*' ){  /* Skip comments */
+              int prevc;
+              cp = &cp[2];
+              prevc = 0;
+              while( (c= *cp)!=0 && (c!='/' || prevc!='*') ){
+                if( c=='\n' ) lineno++;
+                prevc = c;
+                cp++;
+              }
+            }else if( c=='/' && cp[1]=='/' ){  /* Skip C++ style comments too */
+              cp = &cp[2];
+              while( (c= *cp)!=0 && c!='\n' ) cp++;
+              if( c ) lineno++;
+            }else if( c=='\'' || c=='\"' ){    /* String a character literals */
+              int startchar, prevc;
+              startchar = c;
+              prevc = 0;
+              for(cp++; (c= *cp)!=0 && (c!=startchar || prevc=='\\'); cp++){
+                if( c=='\n' ) lineno++;
+                if( prevc=='\\' ) prevc = 0;
+                else              prevc = c;
+              }
+            }
       }
       if( c==0 ){
         ErrorMsg(ps.filename,ps.tokenlineno,
@@ -2477,10 +2477,10 @@ struct lemon *gp;
       }else{
         nextcp = cp+1;
       }
-    }else if( isalnum(c) ){          /* Identifiers */
+    }else if( isalnum(c) ){          /* Identifiers */ // 识别出符号
       while( (c= *cp)!=0 && (isalnum(c) || c=='_') ) cp++;
       nextcp = cp;
-    }else if( c==':' && cp[1]==':' && cp[2]=='=' ){ /* The operator "::=" */
+    }else if( c==':' && cp[1]==':' && cp[2]=='=' ){ /* The operator "::=" */ // 识别出定义符
       cp += 3;
       nextcp = cp;
     }else{                          /* All other (one character) operators */
@@ -2488,9 +2488,9 @@ struct lemon *gp;
       nextcp = cp;
     }
     c = *cp;
-    *cp = 0;                        /* Null terminate the token */
-    parseonetoken(&ps);             /* Parse the token */
-    *cp = c;                        /* Restore the buffer */
+    *cp = 0; //很关键的代码,由于找到了这段符号,所以用\0截断,然后送入 parseonetoken函数分析  /* Null terminate the token */
+    parseonetoken(&ps);             /* Parse the token */ // 开始把一个元素扔到parse 里面去识别下
+    *cp = c; //分析完了之后,进行恢复,必须恢复现场。。。                                  /* Restore the buffer */
     cp = nextcp;
   }
   free(filebuf);                    /* Release the buffer after parsing */
@@ -2526,9 +2526,9 @@ struct plink *Plink_new(){
 }
 
 /* Add a plink to a plink list */
-void Plink_add(plpp,cfp)
-struct plink **plpp;
-struct config *cfp;
+void Plink_add(struct plink **plpp, struct config *cfp)
+//struct plink **plpp;
+//struct config *cfp;
 {
   struct plink *new;
   new = Plink_new();
@@ -2615,8 +2615,8 @@ char *mode;
 
 /* Duplicate the input file without comments and without actions 
 ** on rules */
-void Reprint(lemp)
-struct lemon *lemp;
+void Reprint(struct lemon *lemp)
+//struct lemon *lemp;
 {
   struct rule *rp;
   struct symbol *sp;
@@ -3916,7 +3916,7 @@ char *s2;
 ** Code for processing tables in the LEMON parser generator.
 */
 
-PRIVATE int strhash(x)
+PRIVATE int strhash(x) // 重复得把前一个字符的ASCII值乘以13,再与后一位字母的ASCII值相加,最后得到一个hash值
 char *x;
 {
   int h = 0;
@@ -3928,8 +3928,8 @@ char *x;
 ** keep strings in a table so that the same string is not in more
 ** than one place.
 */
-char *Strsafe(y)
-char *y;
+char *Strsafe(char *y)
+//char *y;
 {
   char *z;
 
@@ -3987,8 +3987,8 @@ void Strsafe_init(){
 }
 /* Insert a new record into the array.  Return TRUE if successful.
 ** Prior data with the same key is NOT overwritten */
-int Strsafe_insert(data)
-char *data;
+int Strsafe_insert(char *data)
+//char *data;
 {
   x1node *np;
   int h;
@@ -4002,22 +4002,22 @@ char *data;
     if( strcmp(np->data,data)==0 ){
       /* An existing entry with the same key is found. */
       /* Fail because overwrite is not allows. */
-      return 0;
+      return 0; // 已经存在了,无需添加
     }
     np = np->next;
   }
-  if( x1a->count>=x1a->size ){
+  if( x1a->count>=x1a->size ){ // 1024个位置不够了,count大于size,这个时候就需要double一下空间
     /* Need to make the hash table bigger */
     int i,size;
     struct s_x1 array;
-    array.size = size = x1a->size*2;
+    array.size = size = x1a->size*2; // 把空间double一下
     array.count = x1a->count;
     array.tbl = (x1node*)malloc(
       (sizeof(x1node) + sizeof(x1node*))*size );
     if( array.tbl==0 ) return 0;  /* Fail due to malloc failure */
     array.ht = (x1node**)&(array.tbl[size]);
     for(i=0; i<size; i++) array.ht[i] = 0;
-    for(i=0; i<x1a->count; i++){
+    for(i=0; i<x1a->count; i++){ // 把老空间的x1a 结构里面的数据全部移到 新空间这里来
       x1node *oldnp, *newnp;
       oldnp = &(x1a->tbl[i]);
       h = strhash(oldnp->data) & (size-1);
@@ -4028,10 +4028,10 @@ char *data;
       newnp->from = &(array.ht[h]);
       array.ht[h] = newnp;
     }
-    free(x1a->tbl);
+    free(x1a->tbl); // 把旧空间的数据free掉
     *x1a = array;
   }
-  /* Insert the new data */
+  /* Insert the new data */ // 如果空间足够,就直接 insert数据
   h = ph & (x1a->size-1);
   np = &(x1a->tbl[x1a->count++]);
   np->data = data;
@@ -4044,8 +4044,8 @@ char *data;
 
 /* Return a pointer to data assigned to the given key.  Return NULL
 ** if no such key. */
-char *Strsafe_find(key)
-char *key;
+char *Strsafe_find(char *key)
+//char *key;
 {
   int h;
   x1node *np;
@@ -4063,13 +4063,13 @@ char *key;
 /* Return a pointer to the (terminal or nonterminal) symbol "x".
 ** Create a new symbol if this is the first time "x" has been seen.
 */
-struct symbol *Symbol_new(x)
-char *x;
+struct symbol *Symbol_new(char *x)
+//char *x;
 {
   struct symbol *sp;
 
   sp = Symbol_find(x);
-  if( sp==0 ){
+  if( sp==0 ){ // sp是0的话,说明 x2a 这个结构体的ht 表没有这个符号。 那就要为这个符号 创建内存
     sp = (struct symbol *)malloc( sizeof(struct symbol) );
     MemoryCheck(sp);
     sp->name = Strsafe(x);
@@ -4096,8 +4096,8 @@ char *x;
 ** We find experimentally that leaving the symbols in their original
 ** order (the order they appeared in the grammar file) gives the
 ** smallest parser tables in SQLite.
-*/
-int Symbolcmpp(struct symbol **a, struct symbol **b){
+*/ // 这个函数结合qsort函数一起使用,首先,明确下,大写的字符跟小写的字符是混合在一起的。 我们需要做的事,就是将大写小写分开,然后大写集合里面跟消协集合里面的原由顺序又不被破坏
+int Symbolcmpp(struct symbol **a, struct symbol **b){ // 所以通过这个函数实现。
   int i1 = (**a).index + 10000000*((**a).name[0]>'Z');
   int i2 = (**b).index + 10000000*((**b).name[0]>'Z');
   return i1-i2;
@@ -4158,14 +4158,14 @@ char *key;
   int ph;
 
   if( x2a==0 ) return 0;
-  ph = strhash(key);
-  h = ph & (x2a->size-1);
+  ph = strhash(key); // 见简单的3919行的代码,hash函数 // 难度在于,:由于strhash函数返回的哈希值的大小范围是无法预知的。
+  h = ph & (x2a->size-1); // x2a->size-1的值是127,也就是111111, 这就是 位与 操作,保证了h的值控制在[0,127]之间
   np = x2a->ht[h];
   while( np ){
     if( strcmp(np->key,key)==0 ){
       /* An existing entry with the same key is found. */
       /* Fail because overwrite is not allows. */
-      return 0;
+      return 0; // 说明符号已经存在了,无需要再添加了
     }
     np = np->next;
   }
@@ -4195,7 +4195,7 @@ char *key;
     free(x2a->tbl);
     *x2a = array;
   }
-  /* Insert the new data */
+  /* Insert the new data */ // 注意写入数据的时候,hash在同一个key上有冲突的时候 用的是 链表解决方法
   h = ph & (x2a->size-1);
   np = &(x2a->tbl[x2a->count++]);
   np->key = key;
