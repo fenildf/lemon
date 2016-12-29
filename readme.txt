@@ -21,7 +21,6 @@ lemon.c 跟 lempar.c是从sqlite-3.1.2.tar.gz 代码中取得的。
 %left            %name                      %nonassoc
 %parse_accept    %parse_failure             %right
 %stack_overflow  %stack_size                %start_symbol
-%syntax_error    %token_destructor          %start_symbol
 %syntax_error    %token_destructor          %token_prefix
 %token_type      %type
 语法文件.y 中允许出现的20个以%开头的特殊指定符,在lemon数据结构中居然有16个与之相关,而不出现在lemon数据结构中的仅仅为%left %right %nonassoc %ifdef-%endif 跟 %ifndef-%endif
@@ -38,7 +37,8 @@ action(动作)
 6、LEMON有两个特殊符号,一个是$ 另一个是error,这两个符号不出现在.y语法文件中,是LEMON程序为进行语法分析而自行"硬填"进去的符号。
 x1a 装备字符串,相当于名字name的存储区域。Strsafe()相关函数
 x2a 装备符号,Symbol_new()函数,包括终结符,也包括非终结符
-x3a 装备状态state跟项目config
+x3a 装备状态state
+x4a 装备项目config
 
 7、词法扫描 过程
 
