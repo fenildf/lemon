@@ -7,6 +7,8 @@ sqlite-3.1.2.tar.gz代码下载网址: http://pkgs.fedoraproject.org/repo/pkgs/s
 
 lemon.c 跟 lempar.c是从sqlite-3.1.2.tar.gz 代码中取得的。
 
+parse.y就是sqlite-3.1.2.tar.gz 中针对SQL写的语法文件。
+
 0、修改lemon.c 的3358行为:out = file_open(lemp,".cpp","wb"); #支持c++
 
 1、gcc -o lemon lemon.c #编译得到lemon可执行文件
