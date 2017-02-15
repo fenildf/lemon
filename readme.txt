@@ -15,6 +15,9 @@ parse.y就是sqlite-3.1.2.tar.gz 中针对SQL写的语法文件。
 
 2、./lemon example4.y -c  #得到example4.cpp、example4.h、example4.out三个文件
 
+2.1、从Mac OS X 10.9/Xcode 5开始，系统里没有GCC了，你以为是GCC的那些gcc和g++之类的命令只是clang的别名。所以Mac下面用g++ -o example1 example1.cpp来编译,用gcc会报错。
+2.2、如果Linux下的是GCC的话,直接gcc -o example1 example1.cpp也是可以的。
+
 3、剩下看CMakeLists.txt文件
 
 4、// LEMON有下述20个特殊的申明符号。每一个特殊符号都以"%"字符为首,后面跟着由小写字母和下划线组成的字符串
