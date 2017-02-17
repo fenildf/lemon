@@ -43,7 +43,7 @@ action(动作)
 x1a 装备字符串,相当于名字name的存储区域。Strsafe()相关函数
 x2a 装备符号,Symbol_new()函数,包括终结符,也包括非终结符
 x3a 装备状态state
-x4a 装备项目config
+x4a 装备项目config。。装备同一状态下面的不同config。。当进行到下一个状态的时候,x4a会被回收清空
 
 7、词法扫描 过程
 
