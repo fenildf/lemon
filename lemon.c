@@ -762,7 +762,7 @@ PRIVATE struct state *getstate(struct lemon *lemp) // 除了第一个状态的�
 /* Construct all successor states to the given state.  A "successor"
 ** state is any state which can be reached by a shift action.
 */
-PRIVATE void buildshifts(struct lemon *lemp,struct state *stp)
+PRIVATE void buildshifts(struct lemon *lemp,struct state *stp) // stp 当前的状态
 //struct lemon *lemp;
 //struct state *stp;     /* The state from which successors are computed */
 {
@@ -775,42 +775,42 @@ PRIVATE void buildshifts(struct lemon *lemp,struct state *stp)
 
   /* Each configuration becomes complete after it contibutes to a successor
   ** state.  Initially, all configurations are incomplete */
-  for(cfp=stp->cfp; cfp; cfp=cfp->next) cfp->status = INCOMPLETE;
+  for(cfp=stp->cfp; cfp; cfp=cfp->next) cfp->status = INCOMPLETE; // 全部设置成INCOMPLETE
 
   /* Loop through all configurations of the state "stp" */
-  for(cfp=stp->cfp; cfp; cfp=cfp->next){
+  for(cfp=stp->cfp; cfp; cfp=cfp->next){ // stp是状态,cfp是当前状态下面的所有的项目
     if( cfp->status==COMPLETE ) continue;    /* Already used by inner loop */
     if( cfp->dot>=cfp->rp->nrhs ) continue;  /* Can't shift this config */
-    Configlist_reset();                      /* Reset the new config set */ // 说明这个项目没有经过处理,也没有到达最右端
+    Configlist_reset();                      /* Reset the new config set */ // 说明这个项目没有经过处理,也没有到达最右端。。Configlist_reset先把currentend跟basisend还有x4a进行清零重置
     sp = cfp->rp->rhs[cfp->dot]; // sp当前分割点后面的符号            /* Symbol after the dot */
 
     /* For every configuration in the state "stp" which has the symbol "sp"
     ** following its dot, add the same configuration to the basis set under
     ** construction but with the dot shifted one symbol to the right. */
-    for(bcfp=cfp; bcfp; bcfp=bcfp->next){
+    for(bcfp=cfp; bcfp; bcfp=bcfp->next){ //
       if( bcfp->status==COMPLETE ) continue;    /* Already used */
       if( bcfp->dot>=bcfp->rp->nrhs ) continue; /* Can't shift this one */
       bsp = bcfp->rp->rhs[bcfp->dot];           /* Get symbol after dot */
-      if( bsp!=sp ) continue;                   /* Must be same as for "cfp" */
+      if( bsp!=sp ) continue;                   /* Must be same as for "cfp" */ // 这句话很好理解。sp保留的是某一项目,那么再来一个for循环,这个for循环要干的事就是把sp这个项目 的分隔符往右移动一位。所以必须当前的bsp等于上一个for循环中保留的sp变量。
       bcfp->status = COMPLETE;                  /* Mark this config as used */
-      new = Configlist_addbasis(bcfp->rp,bcfp->dot+1);
-      Plink_add(&new->bplp,bcfp);
+      new = Configlist_addbasis(bcfp->rp,bcfp->dot+1); // 再把该项目加入到 configlist中去
+      Plink_add(&new->bplp,bcfp); // FIXME 新的项目名字叫做new,它的bplp列表中 应该加入 生成它的这个母体项目  。。这个母体项目就是bcfp、、
     }
 
     /* Get a pointer to the state described by the basis configuration set
     ** constructed in the preceding loop */
-    newstp = getstate(lemp);
+    newstp = getstate(lemp);  // getstate通过闭包运算去拿到 当前basis链的 所有非基本项目。。很好理解啊。。
 
     /* The state "newstp" is reached from the state "stp" by a shift action
     ** on the symbol "sp" */
-    Action_add(&stp->ap,SHIFT,sp,(char *)newstp);
+    Action_add(&stp->ap,SHIFT,sp,(char *)newstp); // 这四个参数 表示,在原来的stp状态中,由于碰到sp符号,进行移进操作,操作的结果是转移到新的newstp状态。但为了记录这种移进行为,用到了action结构体[就是stp->ap]
   }
 }
 
 /*
 ** Construct the propagation links
 */
-void FindLinks(struct lemon *lemp)
+void FindLinks(struct lemon *lemp) // 一句话总结,前承项目中follow集合中的元素,可以通过后继项目中的那个先行符号的First集合求得。。。
 //struct lemon *lemp;
 {
   int i;
@@ -835,7 +835,7 @@ void FindLinks(struct lemon *lemp)
     for(cfp=stp->cfp; cfp; cfp=cfp->next){
       for(plp=cfp->bplp; plp; plp=plp->next){
         other = plp->cfp;
-        Plink_add(&other->fplp,cfp);
+        Plink_add(&other->fplp,cfp); // 说到底,就是把所有的bplp 转成 fplp。。。。我们只用到了fplp来计算follow集合
       }
     }
   }
@@ -846,7 +846,7 @@ void FindLinks(struct lemon *lemp)
 ** A followset is the set of all symbols which can come immediately
 ** after a configuration.
 */
-void FindFollowSets(struct lemon *lemp)
+void FindFollowSets(struct lemon *lemp) // 找到了所有的非终结符的 follow集合。。。哈哈哈哈。无敌了。
 //struct lemon *lemp;
 {
   int i;
@@ -856,7 +856,7 @@ void FindFollowSets(struct lemon *lemp)
   int change;
 
   for (i = 0; i < lemp->nstate; i++) {
-    for (cfp = lemp->sorted[i]->cfp; cfp; cfp = cfp->next) {
+    for (cfp = lemp->sorted[i]->cfp; cfp; cfp = cfp->next) { // cfp是同一个状态下的不同项目
       cfp->status = INCOMPLETE;
     }
   }
@@ -1160,7 +1160,7 @@ void Configlist_closure(struct lemon *lemp) // 闭包运算:只要发现*号 后
         lemp->errorcnt++; // 如果它是非终结符,而它又没有产生式(用sp->rule==0来判断),同时它还不是我们预先认定的错误符号。则有误。 【因为右边的非终结符号,起码得在产生式的左边出现一次。不然非终结符就没办法转成终结符。】
       }
       for (newrp = sp->rule; newrp; newrp = newrp->nextlhs) { //nextlhs 存放着 正是左边具有相同非终结符的产生式链条
-        newcfp = Configlist_add(newrp, 0); // 由sp作为左边符号的每一个产生式,都可以建立一个分割符在0处的项目。这种项目成为 非基本项目、。。。。至此,我们为闭包增加了一条项目。。此处的0表示分隔符的位置
+        newcfp = Configlist_add(newrp, 0); // 由sp作为左边符号的每一个产生式,都可以建立一个分割符在0处的项目。这种项目成为 非基本项目、。。。。至此,我们为闭包增加了一条项目。。此处的0表示分隔符的位置【见example4.out的第3行到5行】
         for (i = dot + 1; i < rp->nrhs; i++) { // TODO 开搞follow集,每个项目,他后面都带了一个follow集合,字段是fws。 // nrhs产生式右边所有符号的总数,既包括非终止符,也包括终止符
           xsp = rp->rhs[i]; // 取分隔符后面的那个符号。 xsp的index就是 该符号在所有symbol符号数组里面的下标值
           if (xsp->type == TERMINAL) {
@@ -1171,9 +1171,9 @@ void Configlist_closure(struct lemon *lemp) // 闭包运算:只要发现*号 后
             if (xsp->lambda == B_FALSE) break; // 假如lambda为false,那么当前符号xsp不可能是空串。它必定有产生式。所以当执行完前面的那个setUnion操作之后,就可跳出循环了,xsp之后的符号不用再考虑了。
           }
         }
-        if (i == rp->nrhs) Plink_add(&cfp->fplp, newcfp); // 如果分割点已经位于最右边符号之后了,只需要把新生成的newcfp项目加挂到正在分析的原来cfp项目的fplp链表中
-      } // 为什么这么做呢?**FOLLOW****集的计算方法：**1. 对于方法的开始符S，置#于FOLLOW(S)中；2. 若A->αBβ是一个产生式，则把FIRST(β)除去{ε}加至FOLLOW(B)中；3. 若A→αB是一个产生式，则把FOLLOW(A)加至FOLLOW(B)中。
-    }   //  Plink_add就是规则3... 具体看代码分析  fplp含义forward propagation links 即项目的顺向传播链表
+        if (i == rp->nrhs) Plink_add(&cfp->fplp, newcfp); // 如果分割点已经位于 原始分析的产生式的最右边符号了,只需要把新生成的newcfp项目加挂到正在分析的cfp项目的fplp链表中
+      } // 为什么这么做呢?**FOLLOW****集的计算方法：**1. 对于方法的开始符S，置#于FOLLOW(S)中,见1163行代码；2. 若A->αBβ是一个产生式，则把FIRST(β)除去{ε}加至FOLLOW(B)中；见1167行跟1170行代码3. 若A→αB是一个产生式，则把FOLLOW(A)加至FOLLOW(B)中,即是Follow(B)包含所有的Follow(A)。
+    }   //  Plink_add就是规则3... 具体看代码分析  fplp含义forward propagation links 即项目的顺向传播链表.。比如state0 由基本项目main ::= * in生成, i=dot+1=1,此时 rp就是main ::= in,所以 rp->nrhs也是1. 所以  此时cfp是main ::= * in,而newcfp是in ::= *或者in ::= * in NEWLINE或者in ::= * in program NEWLINE。 最后设置main ::= * in它的顺向传播链的 为上述的三个节点
   }
   return;
 }
@@ -1430,17 +1430,17 @@ int main(int argc, char ** argv)
     /* Compute all LR(0) states.  Also record follow-set propagation
     ** links so that the follow-set can be computed later */
     lem.nstate = 0; // nstate 状态个数。。此时 状态一个都没有
-    FindStates(&lem); // TODO 最难最难的代码开始了。、、 寻找第一个状态State0的基本项目;;寻找LR(0)的所有状态;;闭包运算。第七章有详细介绍
+    FindStates(&lem); // TODO 最难最难的代码开始了。、、 寻找第一个状态State0的基本项目;;寻找LR(0)的所有状态;;闭包运算。第七章有详细介绍。。。还好啦,我理解了。。。哈哈。。。
     lem.sorted = State_arrayof(); // sorted字段解释:Table of states sorted by state number
-
+    // 2017年2月21号,宣告第七章正式看完。。。收获颇多。。。
     /* Tie up loose ends on the propagation links */
-    FindLinks(&lem); // 寻找follow集合
+    FindLinks(&lem); // 寻找follow集合 // 第八章的前部分的解决就是让 fplp字段【同一状态下的后继项目】跟bplp字段【不同状态下的前承项目】的次序颠倒过来。
 
     /* Compute the follow set of every reducible configuration */
-    FindFollowSets(&lem); // 真正用于寻找Follow集的函数
+    FindFollowSets(&lem); // 真正用于寻找Follow集的函数。。第八章的后面部分就是通过反复的计算,求得所有非终结符的Follow集合
 
     /* Compute the action tables */
-    FindActions(&lem); // 装配动作链表
+    FindActions(&lem); // 装配动作链表 // 第九章是解决规约问题。。
 
     /* Compress the action tables */
     if( compress==0 ) CompressTables(&lem); // 压缩动作链表
