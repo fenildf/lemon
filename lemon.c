@@ -11,7 +11,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdlib.h>
-
+//#include <mhash.h> //为了access函数增加的..mac 电脑才需要
 #ifndef __WIN32__
 #   if defined(_WIN32) || defined(WIN32)
 #	define __WIN32__
@@ -363,8 +363,8 @@ struct action *ap2;
 }
 
 /* Sort parser actions */
-struct action *Action_sort(ap)
-struct action *ap;
+struct action *Action_sort(struct action *ap)
+//struct action *ap;
 {
   ap = (struct action *)msort((char *)ap,(char **)&ap->next,actioncmp);
   return ap;
@@ -396,21 +396,21 @@ void Action_add(struct action **app,enum e_action type,struct symbol *sp,char *a
 /*
 ** The state of the yy_action table under construction is an instance of
 ** the following structure
-*/
+*/ // 作者指出:构建yy_action表的时候,必须采用这个结构。
 typedef struct acttab acttab;
 struct acttab {
-  int nAction;                 /* Number of used slots in aAction[] */
-  int nActionAlloc;            /* Slots allocated for aAction[] */
+  int nAction;                 /* Number of used slots in aAction[] */ // 在aAction[]表中,实际使用元素的数量
+  int nActionAlloc;            /* Slots allocated for aAction[] */ // aAction[]的总长度
   struct {
-    int lookahead;             /* Value of the lookahead token */
-    int action;                /* Action to take on the given lookahead */
-  } *aAction,                  /* The yy_action[] table under construction */
+    int lookahead;             /* Value of the lookahead token */ // 先行符号,它的值是 文法符号在符号表中的下标值
+    int action;                /* Action to take on the given lookahead */ // 相应于某一先行符号的动作序号
+  } *aAction,                  /* The yy_action[] table under construction */ // 就是yy_action的的动作表
     *aLookahead;               /* A single new transaction set */
-  int mnLookahead;             /* Minimum aLookahead[].lookahead */
+  int mnLookahead;             /* Minimum aLookahead[].lookahead */ // 先行符号数组成员中的最小者
   int mnAction;                /* Action associated with mnLookahead */
-  int mxLookahead;             /* Maximum aLookahead[].lookahead */
-  int nLookahead;              /* Used slots in aLookahead[] */
-  int nLookaheadAlloc;         /* Slots allocated in aLookahead[] */
+  int mxLookahead;             /* Maximum aLookahead[].lookahead */ // // 先行符号数组成员中的最大者
+  int nLookahead;              /* Used slots in aLookahead[] */ //aLookahead表的使用数量
+  int nLookaheadAlloc;         /* Slots allocated in aLookahead[] */ //aLookahead表的总数量,总长度
 };
 
 /* Return the number of entries in the yy_action table */
@@ -442,30 +442,30 @@ acttab *acttab_alloc(void){
 
 /* Add a new action to the current transaction set
 */
-void acttab_action(acttab *p, int lookahead, int action){
-  if( p->nLookahead>=p->nLookaheadAlloc ){
-    p->nLookaheadAlloc += 25;
-    p->aLookahead = realloc( p->aLookahead,
-                             sizeof(p->aLookahead[0])*p->nLookaheadAlloc );
-    if( p->aLookahead==0 ){
-      fprintf(stderr,"malloc failed\n");
-      exit(1);
+void acttab_action(acttab *p, int lookahead, int action){ // 新建aLookahead 数组。。。
+    if (p->nLookahead >= p->nLookaheadAlloc) { // 如果观众nLookahead 比 座位nLookaheadAlloc 还多,就要增加座位
+        p->nLookaheadAlloc += 25;
+        p->aLookahead = realloc(p->aLookahead,
+                                sizeof(p->aLookahead[0]) * p->nLookaheadAlloc);
+        if (p->aLookahead == 0) {
+            fprintf(stderr, "malloc failed\n");
+            exit(1);
+        }
     }
-  }
-  if( p->nLookahead==0 ){
-    p->mxLookahead = lookahead;
-    p->mnLookahead = lookahead;
-    p->mnAction = action;
-  }else{
-    if( p->mxLookahead<lookahead ) p->mxLookahead = lookahead;
-    if( p->mnLookahead>lookahead ){
-      p->mnLookahead = lookahead;
-      p->mnAction = action;
-    }
-  }
-  p->aLookahead[p->nLookahead].lookahead = lookahead;
-  p->aLookahead[p->nLookahead].action = action;
-  p->nLookahead++;
+    if (p->nLookahead == 0) { // 当nLookahead为0.就是此时一个先行符都没有。
+        p->mxLookahead = lookahead;
+        p->mnLookahead = lookahead;
+        p->mnAction = action;
+    } else { // 不为0,表示 之前已经放入了先行符。
+        if (p->mxLookahead < lookahead) p->mxLookahead = lookahead; // 如果新进来的先行符在最右边的那个先行符的还要右边,就替换当前最右为新进来的先行符
+        if (p->mnLookahead > lookahead) { // 如果新进来的先行符在最左边的那个先行符的还要左边,就替换当前最左为新进来的先行符
+            p->mnLookahead = lookahead;
+            p->mnAction = action; // mnAction还记录了左边界那个先行符相关联的动作。
+        }
+    } // 再记录 进来的那些值到对应的位置。
+    p->aLookahead[p->nLookahead].lookahead = lookahead;
+    p->aLookahead[p->nLookahead].action = action;
+    p->nLookahead++;
 }
 
 /*
@@ -475,81 +475,81 @@ void acttab_action(acttab *p, int lookahead, int action){
 **
 ** Return the offset into the action table of the new transaction.
 */
-int acttab_insert(acttab *p){
-  int i, j, k, n;
-  assert( p->nLookahead>0 );
+int acttab_insert(acttab *p){ // acttab是一个承载装运器,有两个数组。。此函数新建的是action数组
+    int i, j, k, n;
+    assert(p->nLookahead > 0); // nLookahead 是一个计数器,表示此时送进来该状态已有先行符的个数
 
-  /* Make sure we have enough space to hold the expanded action table
-  ** in the worst case.  The worst case occurs if the transaction set
-  ** must be appended to the current action table
-  */
-  n = p->mxLookahead + 1;
-  if( p->nAction + n >= p->nActionAlloc ){
-    int oldAlloc = p->nActionAlloc;
-    p->nActionAlloc = p->nAction + n + p->nActionAlloc + 20;
-    p->aAction = realloc( p->aAction,
-                          sizeof(p->aAction[0])*p->nActionAlloc);
-    if( p->aAction==0 ){
-      fprintf(stderr,"malloc failed\n");
-      exit(1);
+    /* Make sure we have enough space to hold the expanded action table
+    ** in the worst case.  The worst case occurs if the transaction set
+    ** must be appended to the current action table
+    */
+    n = p->mxLookahead + 1;
+    if (p->nAction + n >= p->nActionAlloc) {
+        int oldAlloc = p->nActionAlloc;
+        p->nActionAlloc = p->nAction + n + p->nActionAlloc + 20;
+        p->aAction = realloc(p->aAction, // 此处新建的是action数组。。而acttab_action中新建的是aLookahead数组。。
+                             sizeof(p->aAction[0]) * p->nActionAlloc);
+        if (p->aAction == 0) {
+            fprintf(stderr, "malloc failed\n");
+            exit(1);
+        } // realloc可以扩大内存空间,并且就空间不变。返回值是->新的内存空间的地址指针。。
+        for (i = oldAlloc; i < p->nActionAlloc; i++) {
+            p->aAction[i].lookahead = -1;
+            p->aAction[i].action = -1;
+        }
     }
-    for(i=oldAlloc; i<p->nActionAlloc; i++){
-      p->aAction[i].lookahead = -1;
-      p->aAction[i].action = -1;
-    }
-  }
 
-  /* Scan the existing action table looking for an offset where we can
-  ** insert the current transaction set.  Fall out of the loop when that
-  ** offset is found.  In the worst case, we fall out of the loop when
-  ** i reaches p->nAction, which means we append the new transaction set.
-  **
-  ** i is the index in p->aAction[] where p->mnLookahead is inserted.
-  */
-  for(i=0; i<p->nAction+p->mnLookahead; i++){
-    if( p->aAction[i].lookahead<0 ){
-      for(j=0; j<p->nLookahead; j++){
+    /* Scan the existing action table looking for an offset where we can
+    ** insert the current transaction set.  Fall out of the loop when that
+    ** offset is found.  In the worst case, we fall out of the loop when
+    ** i reaches p->nAction, which means we append the new transaction set.
+    **
+    ** i is the index in p->aAction[] where p->mnLookahead is inserted.
+    */ // 新的状态数据的  查找 插入线性表的位置。。
+    for (i = 0; i < p->nAction + p->mnLookahead; i++) {
+        if (p->aAction[i].lookahead < 0) { // 如果lookahead小于0.一定是-1.。表示这个位置为空
+            for (j = 0; j < p->nLookahead; j++) {
+                k = p->aLookahead[j].lookahead - p->mnLookahead + i; //mnLookahead 就是前端删除的空档的长度
+                if (k < 0) break; // 必然不会小于0、、
+                if (p->aAction[k].lookahead >= 0) break; // 已经被人占用了。break
+            }
+            if (j < p->nLookahead) continue; // 如果运气好,没有阻拦。。那么 这句话就拉不住了。
+            for (j = 0; j < p->nAction; j++) { // 有疑问。。TODO 见 http://blog.csdn.net/tms_li/article/details/6295158 书本P332
+                if (p->aAction[j].lookahead == j + p->mnLookahead - i) break;
+            }
+            if (j == p->nAction) {
+                break;  /* Fits in empty slots */
+            }
+        } else if (p->aAction[i].lookahead == p->mnLookahead) { // 当发现刚送进来的左边界符先行符mnlookahead与历史上的aAction[i].lookahead相同,就看看他们两者的动作是否相同。
+            if (p->aAction[i].action != p->mnAction) continue; // 动作不相同,不能合二为一。
+            for (j = 0; j < p->nLookahead; j++) { // 如果动作相同,就要对其他元素 做一个判断了。
+                k = p->aLookahead[j].lookahead - p->mnLookahead + i;
+                if (k < 0 || k >= p->nAction) break;
+                if (p->aLookahead[j].lookahead != p->aAction[k].lookahead) break;
+                if (p->aLookahead[j].action != p->aAction[k].action) break;
+            }
+            if (j < p->nLookahead) continue; // 只有把所有的aLookahead跟aciton进行对比。完全一样才跳过此步。
+            n = 0;
+            for (j = 0; j < p->nAction; j++) {
+                if (p->aAction[j].lookahead < 0) continue;
+                if (p->aAction[j].lookahead == j + p->mnLookahead - i) n++; // 对比下数据。
+            }
+            if (n == p->nLookahead) { // 发现所有数据一致。
+                break;  /* Same as a prior transaction set */
+            }
+        }
+    } // 开始插入状态数组的数据到线性表。。
+    /* Insert transaction set at index i. */
+    for (j = 0; j < p->nLookahead; j++) {
         k = p->aLookahead[j].lookahead - p->mnLookahead + i;
-        if( k<0 ) break;
-        if( p->aAction[k].lookahead>=0 ) break;
-      }
-      if( j<p->nLookahead ) continue;
-      for(j=0; j<p->nAction; j++){
-        if( p->aAction[j].lookahead==j+p->mnLookahead-i ) break;
-      }
-      if( j==p->nAction ){
-        break;  /* Fits in empty slots */
-      }
-    }else if( p->aAction[i].lookahead==p->mnLookahead ){
-      if( p->aAction[i].action!=p->mnAction ) continue;
-      for(j=0; j<p->nLookahead; j++){
-        k = p->aLookahead[j].lookahead - p->mnLookahead + i;
-        if( k<0 || k>=p->nAction ) break;
-        if( p->aLookahead[j].lookahead!=p->aAction[k].lookahead ) break;
-        if( p->aLookahead[j].action!=p->aAction[k].action ) break;
-      }
-      if( j<p->nLookahead ) continue;
-      n = 0;
-      for(j=0; j<p->nAction; j++){
-        if( p->aAction[j].lookahead<0 ) continue;
-        if( p->aAction[j].lookahead==j+p->mnLookahead-i ) n++;
-      }
-      if( n==p->nLookahead ){
-        break;  /* Same as a prior transaction set */
-      }
+        p->aAction[k] = p->aLookahead[j];
+        if (k >= p->nAction) p->nAction = k + 1;
     }
-  }
-  /* Insert transaction set at index i. */
-  for(j=0; j<p->nLookahead; j++){
-    k = p->aLookahead[j].lookahead - p->mnLookahead + i;
-    p->aAction[k] = p->aLookahead[j];
-    if( k>=p->nAction ) p->nAction = k+1;
-  }
-  p->nLookahead = 0;
+    p->nLookahead = 0;
 
-  /* Return the offset that is added to the lookahead in order to get the
-  ** index into yy_action of the action */
-  return i - p->mnLookahead;
+    /* Return the offset that is added to the lookahead in order to get the
+    ** index into yy_action of the action */
+    return i - p->mnLookahead; // 返回第一个数字的数组的索引值。
 }
 
 /********************** From the file "assert.c" ****************************/
@@ -883,7 +883,7 @@ static int resolve_conflict();
 
 /* Compute the reduce actions, and resolve conflicts.
 */
-void FindActions(struct lemon *lemp)
+void FindActions(struct lemon *lemp) // 什么时候可以规约reduce呢? 就是那些项目的分割点均已经位于产生式的右侧了。
 //struct lemon *lemp;
 {
   int i, j;
@@ -898,14 +898,14 @@ void FindActions(struct lemon *lemp)
   */
   for (i = 0; i < lemp->nstate; i++) {   /* Loop over all states */
     stp = lemp->sorted[i];
-    for (cfp = stp->cfp; cfp; cfp = cfp->next) {  /* Loop over all configurations */
-      if (cfp->rp->nrhs == cfp->dot) {        /* Is dot at extreme right? */
-        for (j = 0; j < lemp->nterminal; j++) {
-          if (SetFind(cfp->fws, j)) {
+    for (cfp = stp->cfp; cfp; cfp = cfp->next) {  /* Loop over all configurations */ // cfp是同一状态下面的不同项目集合
+      if (cfp->rp->nrhs == cfp->dot) {        /* Is dot at extreme right? */ // 只考虑那些分割点已经到头的项目
+        for (j = 0; j < lemp->nterminal; j++) { // nterminal终结符的总数量
+          if (SetFind(cfp->fws, j)) { // cfp 当前处理的那条分隔符在最右边的项目。。。如果返回true,上面在cfp的follow集合中找到了一个终结符
             /* Add a reduce action to the state "stp" which will reduce by the
             ** rule "cfp->rp" if the lookahead symbol is "lemp->symbols[j]" */
-            Action_add(&stp->ap, REDUCE, lemp->symbols[j], (char *) cfp->rp);
-          }
+            Action_add(&stp->ap, REDUCE, lemp->symbols[j], (char *) cfp->rp); // FIXME 很重要的原理:只有当产生式上所有符号均已入栈之后,同时,与此项目相关的Follow中有一个终结符,那么就是进行规约的好时机了。
+          } // lemp->symbols[j] 是进行规约动作时候,后面跟随的终结符(先行符号 Lookahead Symbol)。。。。。cfp->rp 是rule,就是产生式的意思。也就是cfp项目的'母体'
         }
       }
     }
@@ -914,27 +914,27 @@ void FindActions(struct lemon *lemp)
   /* Add the accepting token */
   if (lemp->start) {
     sp = Symbol_find(lemp->start);
-    if (sp == 0) sp = lemp->rule->lhs;
+    if (sp == 0) sp = lemp->rule->lhs; // 如果没有%start_symbol的值,那么就取得众多产生式的第一条产生式 的左边符号作为 sp
   } else {
     sp = lemp->rule->lhs;
   }
   /* Add to the first state (which is always the starting state of the
   ** finite state machine) an action to ACCEPT if the lookahead is the
   ** start nonterminal.  */
-  Action_add(&lemp->sorted[0]->ap, ACCEPT, sp, 0);
-
-  /* Resolve conflicts */
+  Action_add(&lemp->sorted[0]->ap, ACCEPT, sp, 0); // lemp->sorted[0]表示第一状态state0。。这句话就是说为第一个状态state0跟开始符号start_symbol 找到一个accept的状态。。
+  // 经过上面的两次处理之后,各个状态就找到它们对应的规约动作了。。。【包括state0的accept动作】
+  /* Resolve conflicts */ // 关于前面 如何规约的总结:可以看出,规约除了要求所有的符号都已经入栈之外,还要求后面的那个先行符号【lookahead symbol】的允许。。。
   for (i = 0; i < lemp->nstate; i++) {
     struct action *ap, *nap;
     struct state *stp;
     stp = lemp->sorted[i];
-    assert(stp->ap);
-    stp->ap = Action_sort(stp->ap);
-    for (ap = stp->ap; ap && ap->next; ap = ap->next) {
-      for (nap = ap->next; nap && nap->sp == ap->sp; nap = nap->next) {
+    assert(stp->ap); // 确保 此状态下有 动作链
+    stp->ap = Action_sort(stp->ap); // 对动作链 进行排序。。。这里的排序关键看actioncmp函数。规则是:首选,按先行符号的前后进行排序。其次,如果两个后继符号相同,则按此动作类型排序【见结构体e_action】
+    for (ap = stp->ap; ap && ap->next; ap = ap->next) { // 紧挨着的循环
+      for (nap = ap->next; nap && nap->sp == ap->sp; nap = nap->next) { // 对于 nap->sp == ap->sp, 说明 在同一个状态上,对应某一个先行符号,竟然要做不同的动作。 于是,冲突产生了。
         /* The two actions "ap" and "nap" have the same lookahead.
         ** Figure out which one should be used */
-        lemp->nconflict += resolve_conflict(ap, nap, lemp->errsym);
+        lemp->nconflict += resolve_conflict(ap, nap, lemp->errsym); // TODO resolve_conflict的机制等会说
       }
     }
   }
@@ -944,7 +944,7 @@ void FindActions(struct lemon *lemp)
   for (i = 0; i < lemp->nstate; i++) {
     struct action *ap;
     for (ap = lemp->sorted[i]->ap; ap; ap = ap->next) {
-      if (ap->type == REDUCE) ap->x.rp->canReduce = B_TRUE;
+      if (ap->type == REDUCE) ap->x.rp->canReduce = B_TRUE; // 计算出所有可以规约的产生式。怎么计算:如果行动上的行为类型是reduce,则伴随着这个动作的产生式肯定可以规约的。
     }
   }
   for (rp = lemp->rule; rp; rp = rp->next) {
@@ -967,60 +967,60 @@ void FindActions(struct lemon *lemp)
 ** If either action is a SHIFT, then it must be apx.  This
 ** function won't work if apx->type==REDUCE and apy->type==SHIFT.
 */
-static int resolve_conflict(apx,apy,errsym)
-struct action *apx;
-struct action *apy;
-struct symbol *errsym;   /* The error symbol (if defined.  NULL otherwise) */
-{
+static int resolve_conflict(struct action *apx,struct action *apy,struct symbol *errsym) // apx跟apy是同一个项目下面动作链条上的的不同动作
+//struct action *apx;
+//struct action *apy;
+//struct symbol *errsym;   /* The error symbol (if defined.  NULL otherwise) */
+{ // 看下面的总结信息。送进来函数的apx跟apy两个动作,要么前者移进+后者规约。要么都是规约。
   struct symbol *spx, *spy;
   int errcnt = 0;
-  assert( apx->sp==apy->sp );  /* Otherwise there would be no conflict */
-  if( apx->type==SHIFT && apy->type==REDUCE ){
-    spx = apx->sp;
-    spy = apy->x.rp->precsym;
-    if( spy==0 || spx->prec<0 || spy->prec<0 ){
+  assert(apx->sp == apy->sp);  /* Otherwise there would be no conflict */ // 先确认下apx跟apy动作具有相同的先行符号。如果先行符号不同,也就无所谓冲突了。
+  if (apx->type == SHIFT && apy->type == REDUCE) { // 一、移进规约冲突
+    spx = apx->sp; // 前者apx是移进动作,所以取出apx的先行符号sp、、、、、每一个动作【shift reduce accept】都有一个先行符的。
+    spy = apy->x.rp->precsym; // 由于apy是规约,规约的话,apy的x字段存放的是产生式。!!!所以得到产生式的precsym优先级符号,【就是产生式右边那个用中括号[]包起来的符号 或者 第一个优先级的符号】。
+    if (spy == 0 || spx->prec < 0 || spy->prec < 0) { // 情况1、apy的产生式的precsym优先符号不存在 OR apx的先行符号的优先级小于0[没有定义优先级] OR apy的产生式的优先级符号的优先级小于0[没有定义优先级]
       /* Not enough precedence information. */
-      apy->type = CONFLICT;
+      apy->type = CONFLICT; // 那么无奈,后面那个动作apy 只能设置它的type为CONFLICT冲突
       errcnt++;
-    }else if( spx->prec>spy->prec ){    /* Lower precedence wins */
-      apy->type = RD_RESOLVED;
-    }else if( spx->prec<spy->prec ){
-      apx->type = SH_RESOLVED;
-    }else if( spx->prec==spy->prec && spx->assoc==RIGHT ){ /* Use operator */
-      apy->type = RD_RESOLVED;                             /* associativity */
-    }else if( spx->prec==spy->prec && spx->assoc==LEFT ){  /* to break tie */
-      apx->type = SH_RESOLVED;
-    }else{
-      assert( spx->prec==spy->prec && spx->assoc==NONE );
-      apy->type = CONFLICT;
+    } else if (spx->prec > spy->prec) {    /* Lower precedence wins */
+      apy->type = RD_RESOLVED; // 情况2、好解决,前者的优先级高,那么 设置后者apy为reduce-resolved了
+    } else if (spx->prec < spy->prec) {
+      apx->type = SH_RESOLVED; // 情况3、好解决,后者的优先级高。那么设置前者apx为shift-resolved了
+    } else if (spx->prec == spy->prec && spx->assoc == RIGHT) { /* Use operator */ // 后面的都是情况4,就是 前者后者的优先级一样高。那么只能看下它们的 左右结合 性质了。
+      apy->type = RD_RESOLVED;                             /* associativity */ // 情况4.1、当前者apx的spx符号 结合性是右结合的时候,那么 就前者apx取胜,修改后者的属性。
+    } else if (spx->prec == spy->prec && spx->assoc == LEFT) {  /* to break tie */
+      apx->type = SH_RESOLVED; // 情况4.2、当前者apx的spx符号 结合性是左结合的时候,那么 就后者apy取胜,修改前者的属性。
+    } else {
+      assert(spx->prec == spy->prec && spx->assoc == NONE);
+      apy->type = CONFLICT; // 情况4.3、当前者 没有指定结合性的时候。。那就只能报错了。。LEMON也解决不了这种问题。
       errcnt++;
     }
-  }else if( apx->type==REDUCE && apy->type==REDUCE ){
-    spx = apx->x.rp->precsym;
-    spy = apy->x.rp->precsym;
-    if( spx==0 || spy==0 || spx->prec<0 ||
-    spy->prec<0 || spx->prec==spy->prec ){
+  } else if (apx->type == REDUCE && apy->type == REDUCE) { //// 二、规约规约冲突
+    spx = apx->x.rp->precsym; // 由于都是规约冲突,所以都取到 两者的x【x存放着产生式】 产生式的那个的优先级符号。
+    spy = apy->x.rp->precsym; // FIXME:这里提一下,什么时候 产生式的优先级符号 不存在呢? 当对产生式的右边符号都搜索一遍了之后,发现没有任何一个符号具有优先级。没有通过%left %right 生命的那些符号【y文件中,越往后面声明left跟right结合性的优先级越高】。
+    if (spx == 0 || spy == 0 || spx->prec < 0 ||
+        spy->prec < 0 || spx->prec == spy->prec) {
       apy->type = CONFLICT;
       errcnt++;
-    }else if( spx->prec>spy->prec ){
-      apy->type = RD_RESOLVED;
-    }else if( spx->prec<spy->prec ){
-      apx->type = RD_RESOLVED;
+    } else if (spx->prec > spy->prec) {
+      apy->type = RD_RESOLVED; // 前者取胜
+    } else if (spx->prec < spy->prec) {
+      apx->type = RD_RESOLVED; // 后者取胜
     }
-  }else{
-    assert( 
-      apx->type==SH_RESOLVED ||
-      apx->type==RD_RESOLVED ||
-      apx->type==CONFLICT ||
-      apy->type==SH_RESOLVED ||
-      apy->type==RD_RESOLVED ||
-      apy->type==CONFLICT
-    );
+  } else {
+    assert(
+            apx->type == SH_RESOLVED ||
+            apx->type == RD_RESOLVED ||
+            apx->type == CONFLICT ||
+            apy->type == SH_RESOLVED ||
+            apy->type == RD_RESOLVED ||
+            apy->type == CONFLICT
+    ); // 下面这段英文仔细看。。不能出现规约移进冲突。【只有可能是移进规约冲突】。。因为移进的排序先于规约的排序
     /* The REDUCE/SHIFT case cannot happen because SHIFTs come before
     ** REDUCEs on the list.  If we reach this point it must be because
     ** the parser conflict had already been resolved. */
-  }
-  return errcnt;
+  } // 更不可能出现移进移进冲突,,,因为对于一个符号,我们只有一个移进动作。。。【所谓的移进冲突,可以理解为移进两个符号或者移进一个符号。LEMON不会出现。】
+  return errcnt; // 其实就算出现冲突了。。还是有办法解决的。。【解决办法就是前者取胜,所以我们可以看到前面的代码中,有CONFLICT都是给了后者】
 }
 /********************* From the file "configlist.c" *************************/
 /*
@@ -1440,13 +1440,13 @@ int main(int argc, char ** argv)
     FindFollowSets(&lem); // 真正用于寻找Follow集的函数。。第八章的后面部分就是通过反复的计算,求得所有非终结符的Follow集合
 
     /* Compute the action tables */
-    FindActions(&lem); // 装配动作链表 // 第九章是解决规约问题。。
+    FindActions(&lem); // 9.3节装配动作链表 // 第九章是解决规约问题。。
 
     /* Compress the action tables */
-    if( compress==0 ) CompressTables(&lem); // 压缩动作链表
+    if( compress==0 ) CompressTables(&lem); // 9.4节压缩动作链表
 
     /* Generate a report of the parser generated.  (the "y.output" file) */
-    if( !quiet ) ReportOutput(&lem); // 报告动作链表
+    if( !quiet ) ReportOutput(&lem); // 9.5节报告动作链表
 
     /* Generate the source code for the parser */
     ReportTable(&lem, mhflag); // 如果参数有-m,那么mhflag就不会为0. 为1的话就会输出头文件
@@ -2595,10 +2595,10 @@ char *suffix;
 /* Open a file with a name based on the name of the input file,
 ** but with a different (specified) suffix, and return a pointer
 ** to the stream */
-PRIVATE FILE *file_open(lemp,suffix,mode)
-struct lemon *lemp;
-char *suffix;
-char *mode;
+PRIVATE FILE *file_open(struct lemon *lemp,char *suffix,char *mode)
+//struct lemon *lemp;
+//char *suffix;
+//char *mode;
 {
   FILE *fp;
 
@@ -2692,10 +2692,10 @@ struct lemon *lemp;
 }
 
 /* Print a plink chain */
-PRIVATE void PlinkPrint(out,plp,tag)
-FILE *out;
-struct plink *plp;
-char *tag;
+PRIVATE void PlinkPrint(FILE *out,struct plink *plp,char *tag)
+//FILE *out;
+//struct plink *plp;
+//char *tag;
 {
   while( plp ){
     fprintf(out,"%12s%s (state %2d) ","",tag,plp->cfp->stp->index);
@@ -2738,49 +2738,49 @@ int PrintAction(struct action *ap, FILE *fp, int indent){
 }
 
 /* Generate the "y.output" log file */
-void ReportOutput(lemp)
-struct lemon *lemp;
+void ReportOutput(struct lemon *lemp)
+//struct lemon *lemp;
 {
-  int i;
-  struct state *stp;
-  struct config *cfp;
-  struct action *ap;
-  FILE *fp;
+    int i;
+    struct state *stp;
+    struct config *cfp;
+    struct action *ap;
+    FILE *fp;
 
-  fp = file_open(lemp,".out","wb");
-  if( fp==0 ) return;
-  fprintf(fp," \b");
-  for(i=0; i<lemp->nstate; i++){
-    stp = lemp->sorted[i];
-    fprintf(fp,"State %d:\n",stp->index);
-    if( lemp->basisflag ) cfp=stp->bp;
-    else                  cfp=stp->cfp;
-    while( cfp ){
-      char buf[20];
-      if( cfp->dot==cfp->rp->nrhs ){
-        sprintf(buf,"(%d)",cfp->rp->index);
-        fprintf(fp,"    %5s ",buf);
-      }else{
-        fprintf(fp,"          ");
-      }
-      ConfigPrint(fp,cfp);
-      fprintf(fp,"\n");
+    fp = file_open(lemp, ".out", "wb");
+    if (fp == 0) return;
+    fprintf(fp, " \b"); // 好像mac的\b 无效??[退格符号]
+    for (i = 0; i < lemp->nstate; i++) {
+        stp = lemp->sorted[i];
+        fprintf(fp, "State %d:\n", stp->index);
+        if (lemp->basisflag) cfp = stp->bp;
+        else cfp = stp->cfp;
+        while (cfp) {
+            char buf[20];
+            if (cfp->dot == cfp->rp->nrhs) {
+                sprintf(buf, "(%d)", cfp->rp->index);
+                fprintf(fp, "    %5s ", buf);
+            } else {
+                fprintf(fp, "          ");
+            }
+            ConfigPrint(fp, cfp);
+            fprintf(fp, "\n");
 #ifdef TEST
-      SetPrint(fp,cfp->fws,lemp);
-      PlinkPrint(fp,cfp->fplp,"To  ");
-      PlinkPrint(fp,cfp->bplp,"From");
+            SetPrint(fp,cfp->fws,lemp);
+            PlinkPrint(fp,cfp->fplp,"To  ");
+            PlinkPrint(fp,cfp->bplp,"From");
 #endif
-      if( lemp->basisflag ) cfp=cfp->bp;
-      else                  cfp=cfp->next;
+            if (lemp->basisflag) cfp = cfp->bp;
+            else cfp = cfp->next;
+        }
+        fprintf(fp, "\n");
+        for (ap = stp->ap; ap; ap = ap->next) {
+            if (PrintAction(ap, fp, 30)) fprintf(fp, "\n");
+        }
+        fprintf(fp, "\n");
     }
-    fprintf(fp,"\n");
-    for(ap=stp->ap; ap; ap=ap->next){
-      if( PrintAction(ap,fp,30) ) fprintf(fp,"\n");
-    }
-    fprintf(fp,"\n");
-  }
-  fclose(fp);
-  return;
+    fclose(fp);
+    return;
 }
 
 /* Search for the file "name" which is in the same directory as
@@ -2832,9 +2832,9 @@ int modemask;
 ** which is to be put in the action table of the generated machine.
 ** Return negative if no action should be generated.
 */
-PRIVATE int compute_action(lemp,ap)
-struct lemon *lemp;
-struct action *ap;
+PRIVATE int compute_action(struct lemon *lemp,struct action *ap)
+//struct lemon *lemp;
+//struct action *ap;
 {
   int act;
   switch( ap->type ){
@@ -2857,31 +2857,31 @@ struct action *ap;
 ** if name!=0, then any word that begin with "Parse" is changed to
 ** begin with *name instead.
 */
-PRIVATE void tplt_xfer(name,in,out,lineno)
-char *name;
-FILE *in;
-FILE *out;
-int *lineno;
-{
-  int i, iStart;
-  char line[LINESIZE];
-  while( fgets(line,LINESIZE,in) && (line[0]!='%' || line[1]!='%') ){
-    (*lineno)++;
-    iStart = 0;
-    if( name ){
-      for(i=0; line[i]; i++){
-        if( line[i]=='P' && strncmp(&line[i],"Parse",5)==0
-          && (i==0 || !isalpha(line[i-1]))
-        ){
-          if( i>iStart ) fprintf(out,"%.*s",i-iStart,&line[iStart]);
-          fprintf(out,"%s",name);
-          i += 4;
-          iStart = i+1;
+PRIVATE void tplt_xfer(char *name,FILE *in,FILE *out,int *lineno)
+//char *name;
+//FILE *in;
+//FILE *out;
+//int *lineno;
+{ // 这个函数一句话概括:只要没有碰到%%,就从"in源" 一行一行 全部copy再粘贴到 "out去处"。
+    int i, iStart;
+    char line[LINESIZE];
+    while (fgets(line, LINESIZE, in) && (line[0] != '%' || line[1] != '%')) { // 这句while一定先执行fgets读取1000个字符到line,再判断line[0] 跟 line[1]
+        (*lineno)++;
+        iStart = 0;
+        if (name) {
+            for (i = 0; line[i]; i++) {
+                if (line[i] == 'P' && strncmp(&line[i], "Parse", 5) == 0
+                    && (i == 0 || !isalpha(line[i - 1]))
+                        ) {
+                    if (i > iStart) fprintf(out, "%.*s", i - iStart, &line[iStart]);
+                    fprintf(out, "%s", name);
+                    i += 4;
+                    iStart = i + 1;
+                }
+            }
         }
-      }
+        fprintf(out, "%s", &line[iStart]);
     }
-    fprintf(out,"%s",&line[iStart]);
-  }
 }
 
 /* The next function finds the template file and opens it, returning
@@ -2889,78 +2889,78 @@ int *lineno;
 PRIVATE FILE *tplt_open(struct lemon *lemp) // 打开模板文件
 //struct lemon *lemp;
 {
-  static char templatename[] = "lempar.c";
-  char buf[1000];
-  FILE *in;
-  char *tpltname;
-  char *cp;
+    static char templatename[] = "lempar.c";
+    char buf[1000];
+    FILE *in;
+    char *tpltname;
+    char *cp;
 
-  cp = strrchr(lemp->filename,'.');
-  if( cp ){
-    sprintf(buf,"%.*s.lt",(int)(cp-lemp->filename),lemp->filename);
-  }else{
-    sprintf(buf,"%s.lt",lemp->filename);
-  }
-  if( access(buf,004)==0 ){
-    tpltname = buf;
-  }else if( access(templatename,004)==0 ){
-    tpltname = templatename;
-  }else{
-    tpltname = pathsearch(lemp->argv0,templatename,0);
-  }
-  if( tpltname==0 ){
-    fprintf(stderr,"Can't find the parser driver template file \"%s\".\n",
-    templatename);
-    lemp->errorcnt++;
-    return 0;
-  }
-  in = fopen(tpltname,"rb");
-  if( in==0 ){
-    fprintf(stderr,"Can't open the template file \"%s\".\n",templatename);
-    lemp->errorcnt++;
-    return 0;
-  }
-  return in;
+    cp = strrchr(lemp->filename, '.');
+    if (cp) {
+        sprintf(buf, "%.*s.lt", (int) (cp - lemp->filename), lemp->filename);
+    } else {
+        sprintf(buf, "%s.lt", lemp->filename);
+    }
+    if (access(buf, 004) == 0) { // 判断是否example1.lt文件是否有可读取权限。
+        tpltname = buf;
+    } else if (access(templatename, 004) == 0) {
+        tpltname = templatename;
+    } else {
+        tpltname = pathsearch(lemp->argv0, templatename, 0);
+    }
+    if (tpltname == 0) {
+        fprintf(stderr, "Can't find the parser driver template file \"%s\".\n",
+                templatename);
+        lemp->errorcnt++;
+        return 0;
+    }
+    in = fopen(tpltname, "rb");
+    if (in == 0) {
+        fprintf(stderr, "Can't open the template file \"%s\".\n", templatename);
+        lemp->errorcnt++;
+        return 0;
+    }
+    return in;
 }
 
 /* Print a #line directive line to the output file. */
-PRIVATE void tplt_linedir(out,lineno,filename)
-FILE *out;
-int lineno;
-char *filename;
+PRIVATE void tplt_linedir(FILE *out,int lineno,char *filename)
+//FILE *out;
+//int lineno;
+//char *filename;
 {
-  fprintf(out,"#line %d \"",lineno);
-  while( *filename ){
-    if( *filename == '\\' ) putc('\\',out);
-    putc(*filename,out);
-    filename++;
-  }
-  fprintf(out,"\"\n");
+    fprintf(out, "#line %d \"", lineno);
+    while (*filename) {
+        if (*filename == '\\') putc('\\', out);
+        putc(*filename, out);
+        filename++;
+    }
+    fprintf(out, "\"\n");
 }
 
 /* Print a string to the file and keep the linenumber up to date */
-PRIVATE void tplt_print(out,lemp,str,strln,lineno)
-FILE *out;
-struct lemon *lemp;
-char *str;
-int strln;
-int *lineno;
+PRIVATE void tplt_print(FILE *out,struct lemon *lemp,char *str,int strln,int *lineno)
+//FILE *out;
+//struct lemon *lemp;
+//char *str;
+//int strln;
+//int *lineno;
 {
-  if( str==0 ) return;
-  tplt_linedir(out,strln,lemp->filename);
-  (*lineno)++;
-  while( *str ){
-    if( *str=='\n' ) (*lineno)++;
-    putc(*str,out);
-    str++;
-  }
-  if( str[-1]!='\n' ){
-    putc('\n',out);
+    if (str == 0) return;
+    tplt_linedir(out, strln, lemp->filename);
     (*lineno)++;
-  }
-  tplt_linedir(out,*lineno+2,lemp->outname); 
-  (*lineno)+=2;
-  return;
+    while (*str) {
+        if (*str == '\n') (*lineno)++;
+        putc(*str, out);
+        str++;
+    }
+    if (str[-1] != '\n') { // 如果前一个字符不是是\n 那还得继续输出。保证新内容从新行开始
+        putc('\n', out);
+        (*lineno)++;
+    }
+    tplt_linedir(out, *lineno + 2, lemp->outname);
+    (*lineno) += 2;
+    return;
 }
 
 /*
@@ -2973,39 +2973,39 @@ struct symbol *sp;
 struct lemon *lemp;
 int *lineno;
 {
- char *cp = 0;
+    char *cp = 0;
 
- int linecnt = 0;
- if( sp->type==TERMINAL ){
-   cp = lemp->tokendest;
-   if( cp==0 ) return;
-   tplt_linedir(out,lemp->tokendestln,lemp->filename);
-   fprintf(out,"{");
- }else if( sp->destructor ){
-   cp = sp->destructor;
-   tplt_linedir(out,sp->destructorln,lemp->filename);
-   fprintf(out,"{");
- }else if( lemp->vardest ){
-   cp = lemp->vardest;
-   if( cp==0 ) return;
-   tplt_linedir(out,lemp->vardestln,lemp->filename);
-   fprintf(out,"{");
- }else{
-   assert( 0 );  /* Cannot happen */
- }
- for(; *cp; cp++){
-   if( *cp=='$' && cp[1]=='$' ){
-     fprintf(out,"(yypminor->yy%d)",sp->dtnum);
-     cp++;
-     continue;
-   }
-   if( *cp=='\n' ) linecnt++;
-   fputc(*cp,out);
- }
- (*lineno) += 3 + linecnt;
- fprintf(out,"}\n");
- tplt_linedir(out,*lineno,lemp->outname);
- return;
+    int linecnt = 0;
+    if (sp->type == TERMINAL) {
+        cp = lemp->tokendest;
+        if (cp == 0) return;
+        tplt_linedir(out, lemp->tokendestln, lemp->filename);
+        fprintf(out, "{");
+    } else if (sp->destructor) {
+        cp = sp->destructor;
+        tplt_linedir(out, sp->destructorln, lemp->filename);
+        fprintf(out, "{");
+    } else if (lemp->vardest) {
+        cp = lemp->vardest;
+        if (cp == 0) return;
+        tplt_linedir(out, lemp->vardestln, lemp->filename);
+        fprintf(out, "{");
+    } else {
+        assert(0);  /* Cannot happen */
+    }
+    for (; *cp; cp++) {
+        if (*cp == '$' && cp[1] == '$') {
+            fprintf(out, "(yypminor->yy%d)", sp->dtnum);
+            cp++;
+            continue;
+        }
+        if (*cp == '\n') linecnt++;
+        fputc(*cp, out);
+    }
+    (*lineno) += 3 + linecnt;
+    fprintf(out, "}\n");
+    tplt_linedir(out, *lineno, lemp->outname);
+    return;
 }
 
 /*
@@ -3186,110 +3186,122 @@ int *lineno;
 ** and nonterminals.  In the process of computing and printing this
 ** union, also set the ".dtnum" field of every terminal and nonterminal
 ** symbol.
-*/
-void print_stack_union(out,lemp,plineno,mhflag)
-FILE *out;                  /* The output stream */
-struct lemon *lemp;         /* The main info structure for this parser */
-int *plineno;               /* Pointer to the line number */
-int mhflag;                 /* True if generating makeheaders output */
-{
-  int lineno = *plineno;    /* The line number of the output */
-  char **types;             /* A hash table of datatypes */
-  int arraysize;            /* Size of the "types" array */
-  int maxdtlength;          /* Maximum length of any ".datatype" field. */
-  char *stddt;              /* Standardized name for a datatype */
-  int i,j;                  /* Loop counters */
-  int hash;                 /* For hashing the name of a type */
-  char *name;               /* Name of the parser */
+*/ // 一般来说。终结符的统一数据类型加上非终结符的多种数据类型,各个文法符号的数据类型就会五花八门。如何用 一种统一的数据类型来描述它们,就是这个函数要处理的任务。
+void print_stack_union(FILE *out, struct lemon *lemp, int *plineno, int mhflag)
+//FILE *out;                  /* The output stream */
+//struct lemon *lemp;         /* The main info structure for this parser */
+//int *plineno;               /* Pointer to the line number */
+//int mhflag;                 /* True if generating makeheaders output */
+{ // 解决的核心思想,就是用 C语言的联合类型。
+    int lineno = *plineno;    /* The line number of the output */
+    char **types;             /* A hash table of datatypes */ // hash表,用来放置文法符号所有数据类型的名字
+    int arraysize;            /* Size of the "types" array */
+    int maxdtlength;          /* Maximum length of any ".datatype" field. */
+    char *stddt;              /* Standardized name for a datatype */ // stddt则是容纳字符串的一维数组
+    int i, j;                  /* Loop counters */
+    int hash;                 /* For hashing the name of a type */
+    char *name;               /* Name of the parser */
 
-  /* Allocate and initialize types[] and allocate stddt[] */
-  arraysize = lemp->nsymbol * 2;
-  types = (char**)malloc( arraysize * sizeof(char*) );
-  for(i=0; i<arraysize; i++) types[i] = 0;
-  maxdtlength = 0;
-  if( lemp->vartype ){
-    maxdtlength = strlen(lemp->vartype);
-  }
-  for(i=0; i<lemp->nsymbol; i++){
-    int len;
-    struct symbol *sp = lemp->symbols[i];
-    if( sp->datatype==0 ) continue;
-    len = strlen(sp->datatype);
-    if( len>maxdtlength ) maxdtlength = len;
-  }
-  stddt = (char*)malloc( maxdtlength*2 + 1 );
-  if( types==0 || stddt==0 ){
-    fprintf(stderr,"Out of memory.\n");
-    exit(1);
-  }
-
-  /* Build a hash table of datatypes. The ".dtnum" field of each symbol
-  ** is filled in with the hash index plus 1.  A ".dtnum" value of 0 is
-  ** used for terminal symbols.  If there is no %default_type defined then
-  ** 0 is also used as the .dtnum value for nonterminals which do not specify
-  ** a datatype using the %type directive.
-  */
-  for(i=0; i<lemp->nsymbol; i++){
-    struct symbol *sp = lemp->symbols[i];
-    char *cp;
-    if( sp==lemp->errsym ){
-      sp->dtnum = arraysize+1;
-      continue;
+    /* Allocate and initialize types[] and allocate stddt[] */
+    arraysize = lemp->nsymbol * 2; // 先取得 符号总数的两倍。。
+    types = (char **) malloc(arraysize * sizeof(char *)); //
+    for (i = 0; i < arraysize; i++) types[i] = 0;
+    maxdtlength = 0; // maxdtlength记录最长的字符串
+    if (lemp->vartype) { // vartype 是默认的非终结符的数据类型,由%default_type特殊申明符指定。
+        maxdtlength = strlen(lemp->vartype); // 不为空的话,就将 maxdtlength 设为该申明符号的字符串长度
     }
-    if( sp->type!=NONTERMINAL || (sp->datatype==0 && lemp->vartype==0) ){
-      sp->dtnum = 0;
-      continue;
+    for (i = 0; i < lemp->nsymbol; i++) {
+        int len;
+        struct symbol *sp = lemp->symbols[i];
+        if (sp->datatype == 0) continue; // datatype是一个字符串,安放着这个符号的数据类型信息。
+        len = strlen(sp->datatype);
+        if (len > maxdtlength) maxdtlength = len; // 继续计算maxdtlength值
     }
-    cp = sp->datatype;
-    if( cp==0 ) cp = lemp->vartype;
-    j = 0;
-    while( isspace(*cp) ) cp++;
-    while( *cp ) stddt[j++] = *cp++;
-    while( j>0 && isspace(stddt[j-1]) ) j--;
-    stddt[j] = 0;
-    hash = 0;
-    for(j=0; stddt[j]; j++){
-      hash = hash*53 + stddt[j];
-    }
-    hash = (hash & 0x7fffffff)%arraysize;
-    while( types[hash] ){
-      if( strcmp(types[hash],stddt)==0 ){
-        sp->dtnum = hash + 1;
-        break;
-      }
-      hash++;
-      if( hash>=arraysize ) hash = 0;
-    }
-    if( types[hash]==0 ){
-      sp->dtnum = hash + 1;
-      types[hash] = (char*)malloc( strlen(stddt)+1 );
-      if( types[hash]==0 ){
-        fprintf(stderr,"Out of memory.\n");
+    stddt = (char *) malloc(maxdtlength * 2 + 1); // maxdtlength doule一下再+1
+    if (types == 0 || stddt == 0) { // stddt 全称是standardized name for a datatype
+        fprintf(stderr, "Out of memory.\n");
         exit(1);
-      }
-      strcpy(types[hash],stddt);
     }
-  }
 
-  /* Print out the definition of YYTOKENTYPE and YYMINORTYPE */
-  name = lemp->name ? lemp->name : "Parse";
-  lineno = *plineno;
-  if( mhflag ){ fprintf(out,"#if INTERFACE\n"); lineno++; }
-  fprintf(out,"#define %sTOKENTYPE %s\n",name,
-    lemp->tokentype?lemp->tokentype:"void*");  lineno++;
-  if( mhflag ){ fprintf(out,"#endif\n"); lineno++; }
-  fprintf(out,"typedef union {\n"); lineno++;
-  fprintf(out,"  %sTOKENTYPE yy0;\n",name); lineno++;
-  for(i=0; i<arraysize; i++){
-    if( types[i]==0 ) continue;
-    fprintf(out,"  %s yy%d;\n",types[i],i+1); lineno++;
-    free(types[i]);
-  }
-  fprintf(out,"  int yy%d;\n",lemp->errsym->dtnum); lineno++;
-  free(stddt);
-  free(types);
-  fprintf(out,"} YYMINORTYPE;\n"); lineno++;
-  *plineno = lineno;
+    /* Build a hash table of datatypes. The ".dtnum" field of each symbol
+    ** is filled in with the hash index plus 1.  A ".dtnum" value of 0 is
+    ** used for terminal symbols.  If there is no %default_type defined then
+    ** 0 is also used as the .dtnum value for nonterminals which do not specify
+    ** a datatype using the %type directive.
+    */
+    for (i = 0; i < lemp->nsymbol; i++) {
+        struct symbol *sp = lemp->symbols[i];
+        char *cp;
+        if (sp == lemp->errsym) { // error 既不是终结符也不是非终结符
+            sp->dtnum = arraysize + 1; //arraysize 为  符号总数的两倍。。 错误符号的dtnum 已经越界了。。
+            continue;
+        }
+        if (sp->type != NONTERMINAL || (sp->datatype == 0 && lemp->vartype == 0)) { // 终结符,或者是【非终结符,但是此非终结符的datatype是null,并且y文件的默认datatype也是null】
+            sp->dtnum = 0; // dtnum就是data type num的意思。。
+            continue;
+        }
+        cp = sp->datatype; // 有自己的数据类型的非终结符。。。
+        if (cp == 0) cp = lemp->vartype; // 该终结符本身没有数据类型,但是 y文件有定义一个 默认的全局数据类型vartype
+        j = 0; // 经过以上几步的处理。所有符号【除了特殊的error符号】都应该有自己的数据类型了。
+        while (isspace(*cp)) cp++; // 忽略前面的空格符号
+        while (*cp) stddt[j++] = *cp++; // 从非空格符号开始,全部拷贝到stddt数组里面。
+        while (j > 0 && isspace(stddt[j - 1])) j--; // 从后面开始,把后面的空格符号也删了。
+        stddt[j] = 0; // 结合上面的那句代码。把后面的空格符号也删了。
+        hash = 0; // stddt字符串就装载了 这个非终结符号的数据类型
+        for (j = 0; stddt[j]; j++) {
+            hash = hash * 53 + stddt[j];
+        }
+        hash = (hash & 0x7fffffff) % arraysize; // 计算hash。。得到一个hash整数值。
+        while (types[hash]) { // types数组已经存在这个 数据类型。
+            if (strcmp(types[hash], stddt) == 0) {
+                sp->dtnum = hash + 1; // 如果找到了,, 就hash+1 作为dtnum的值。。
+                break;
+            }
+            hash++; // 如果找不到,就+1,,然后继续寻找types数组的下一个hash值。
+            if (hash >= arraysize) hash = 0; // 如果到达边界了,就得重头开始。
+        } // 不用当心 找不到 空档。。。。因为types的长度是文法符号总数量的两倍。就算每个符号有一种数据类型,最后还有一半的空档。
+        if (types[hash] == 0) { // types数组没有存在这个 数据类型。
+            sp->dtnum = hash + 1; // 可从 此非终结符sp的字段dtnum,得到 types hash表的 具体值
+            types[hash] = (char *) malloc(strlen(stddt) + 1);
+            if (types[hash] == 0) {
+                fprintf(stderr, "Out of memory.\n");
+                exit(1);
+            }
+            strcpy(types[hash], stddt); // 把 这个数据类型的字符串 存入 types hash表中
+        }
+    }
+// 当然,,,通过得到sp的dtnum字段,这个值减掉1.再去types数组里面找下,就能找到这个符号的数据类型了。。。还有一些特例,比如①终结符,它的dtnum是0.②没有对任何非终结符号指定数据类型的话,dtnum也是0③错误的error符号,dtnum是
+    /* Print out the definition of YYTOKENTYPE and YYMINORTYPE */ // 有了上面的信息,就能对YYTOKENTYPE跟YYMINORTYPE赋值了。
+    name = lemp->name ? lemp->name : "Parse"; // lemp->name 是通过%name 申明符号 赋值的。如果没有这个申明符号,那么就是Parse
+    lineno = *plineno;
+    if (mhflag) {
+        fprintf(out, "#if INTERFACE\n");
+        lineno++;
+    }
+    fprintf(out, "#define %sTOKENTYPE %s\n", name,
+            lemp->tokentype ? lemp->tokentype : "void*"); // 没有用%token_type 申明符指定tokentype的话,那么就用默认值void*
+    lineno++;
+    if (mhflag) {
+        fprintf(out, "#endif\n");
+        lineno++;
+    }
+    fprintf(out, "typedef union {\n");
+    lineno++;
+    fprintf(out, "  %sTOKENTYPE yy0;\n", name);
+    lineno++;
+    for (i = 0; i < arraysize; i++) {
+        if (types[i] == 0) continue;
+        fprintf(out, "  %s yy%d;\n", types[i], i + 1);
+        lineno++;
+        free(types[i]);
+    }
+    fprintf(out, "  int yy%d;\n", lemp->errsym->dtnum);
+    lineno++;
+    free(stddt);
+    free(types);
+    fprintf(out, "} YYMINORTYPE;\n");
+    lineno++;
+    *plineno = lineno;
 }
 
 /*
@@ -3297,21 +3309,21 @@ int mhflag;                 /* True if generating makeheaders output */
 ** lwr and upr, inclusive.
 */
 static const char *minimum_size_type(int lwr, int upr){
-  if( lwr>=0 ){
-    if( upr<=255 ){
-      return "unsigned char";
-    }else if( upr<65535 ){
-      return "unsigned short int";
-    }else{
-      return "unsigned int";
+    if (lwr >= 0) {
+        if (upr <= 255) {
+            return "unsigned char";
+        } else if (upr < 65535) {
+            return "unsigned short int";
+        } else {
+            return "unsigned int";
+        }
+    } else if (lwr >= -127 && upr <= 127) {
+        return "signed char";
+    } else if (lwr >= -32767 && upr < 32767) {
+        return "short";
+    } else {
+        return "int";
     }
-  }else if( lwr>=-127 && upr<=127 ){
-    return "signed char";
-  }else if( lwr>=-32767 && upr<32767 ){
-    return "short";
-  }else{
-    return "int";
-  }
 }
 
 /*
@@ -3322,8 +3334,8 @@ static const char *minimum_size_type(int lwr, int upr){
 */
 struct axset {
   struct state *stp;   /* A pointer to a state */
-  int isTkn;           /* True to use tokens.  False for non-terminals */
-  int nAction;         /* Number of actions */
+  int isTkn;           /* True to use tokens.  False for non-terminals */ /// 非0为终结符,就是Token。0表示终结符
+  int nAction;         /* Number of actions */ // 状态stp指针中的指定某个动作
 };
 
 /*
@@ -3340,450 +3352,509 @@ void ReportTable(struct lemon *lemp, int mhflag)
 //struct lemon *lemp;
 //int mhflag;     /* Output in makeheaders format if true */
 {
-  FILE *out, *in;
-  char line[LINESIZE];
-  int  lineno;
-  struct state *stp;
-  struct action *ap;
-  struct rule *rp;
-  struct acttab *pActtab;
-  int i, j, n;
-  char *name;
-  int mnTknOfst, mxTknOfst;
-  int mnNtOfst, mxNtOfst;
-  struct axset *ax;
+    FILE *out, *in;
+    char line[LINESIZE];
+    int lineno;
+    struct state *stp;
+    struct action *ap;
+    struct rule *rp;
+    struct acttab *pActtab; // 转运承载器
+    int i, j, n;
+    char *name;
+    int mnTknOfst, mxTknOfst;
+    int mnNtOfst, mxNtOfst;
+    struct axset *ax;
 
-  in = tplt_open(lemp);
-  if( in==0 ) return;
-  out = file_open(lemp,".cpp","wb");
-  if( out==0 ){
-    fclose(in);
-    return;
-  }
-  lineno = 1;
-  tplt_xfer(lemp->name,in,out,&lineno);
-
-  /* Generate the include code, if any */
-  tplt_print(out,lemp,lemp->include,lemp->includeln,&lineno);
-  if( mhflag ){
-    char *name = file_makename(lemp, ".h");
-    fprintf(out,"#include \"%s\"\n", name); lineno++;
-    free(name);
-  }
-  tplt_xfer(lemp->name,in,out,&lineno);
-
-  /* Generate #defines for all tokens */
-  if( mhflag ){
-    char *prefix;
-    fprintf(out,"#if INTERFACE\n"); lineno++;
-    if( lemp->tokenprefix ) prefix = lemp->tokenprefix;
-    else                    prefix = "";
-    for(i=1; i<lemp->nterminal; i++){
-      fprintf(out,"#define %s%-30s %2d\n",prefix,lemp->symbols[i]->name,i);
-      lineno++;
+    in = tplt_open(lemp); // 打开模板文件
+    if (in == 0) return;
+    out = file_open(lemp, ".cpp", "wb");
+    if (out == 0) {
+        fclose(in);
+        return;
     }
-    fprintf(out,"#endif\n"); lineno++;
-  }
-  tplt_xfer(lemp->name,in,out,&lineno);
-
-  /* Generate the defines */
-  fprintf(out,"#define YYCODETYPE %s\n",
-    minimum_size_type(0, lemp->nsymbol+5)); lineno++;
-  fprintf(out,"#define YYNOCODE %d\n",lemp->nsymbol+1);  lineno++;
-  fprintf(out,"#define YYACTIONTYPE %s\n",
-    minimum_size_type(0, lemp->nstate+lemp->nrule+5));  lineno++;
-  print_stack_union(out,lemp,&lineno,mhflag);
-  if( lemp->stacksize ){
-    if( atoi(lemp->stacksize)<=0 ){
-      ErrorMsg(lemp->filename,0,
-"Illegal stack size: [%s].  The stack size should be an integer constant.",
-        lemp->stacksize);
-      lemp->errorcnt++;
-      lemp->stacksize = "100";
+    lineno = 1; // 记录跟踪 输出文件 example.cpp 中的行号。。。FIXME:书中P295页说是跟踪lempar.c模板文件中的行号,是错误的。
+    tplt_xfer(lemp->name, in, out, &lineno); // 一开始的lemp->name 一定是nil,什么都没有。。遇到第一个双百分号
+    // FIXME:切记,tplt_print用来打印lemp数据到双百分号那个地方。。tplt_xfer用来打印模板lempar.c的数据,遇到双百分号停止返回
+    /* Generate the include code, if any */
+    tplt_print(out, lemp, lemp->include, lemp->includeln, &lineno); // 1、第一个百分号用来放include头部
+    if (mhflag) {
+        char *name = file_makename(lemp, ".h");
+        fprintf(out, "#include \"%s\"\n", name);
+        lineno++;
+        free(name);
     }
-    fprintf(out,"#define YYSTACKDEPTH %s\n",lemp->stacksize);  lineno++;
-  }else{
-    fprintf(out,"#define YYSTACKDEPTH 100\n");  lineno++;
-  }
-  if( mhflag ){
-    fprintf(out,"#if INTERFACE\n"); lineno++;
-  }
-  name = lemp->name ? lemp->name : "Parse";
-  if( lemp->arg && lemp->arg[0] ){
-    int i;
-    i = strlen(lemp->arg);
-    while( i>=1 && isspace(lemp->arg[i-1]) ) i--;
-    while( i>=1 && (isalnum(lemp->arg[i-1]) || lemp->arg[i-1]=='_') ) i--;
-    fprintf(out,"#define %sARG_SDECL %s;\n",name,lemp->arg);  lineno++;
-    fprintf(out,"#define %sARG_PDECL ,%s\n",name,lemp->arg);  lineno++;
-    fprintf(out,"#define %sARG_FETCH %s = yypParser->%s\n",
-                 name,lemp->arg,&lemp->arg[i]);  lineno++;
-    fprintf(out,"#define %sARG_STORE yypParser->%s = %s\n",
-                 name,&lemp->arg[i],&lemp->arg[i]);  lineno++;
-  }else{
-    fprintf(out,"#define %sARG_SDECL\n",name);  lineno++;
-    fprintf(out,"#define %sARG_PDECL\n",name);  lineno++;
-    fprintf(out,"#define %sARG_FETCH\n",name); lineno++;
-    fprintf(out,"#define %sARG_STORE\n",name); lineno++;
-  }
-  if( mhflag ){
-    fprintf(out,"#endif\n"); lineno++;
-  }
-  fprintf(out,"#define YYNSTATE %d\n",lemp->nstate);  lineno++;
-  fprintf(out,"#define YYNRULE %d\n",lemp->nrule);  lineno++;
-  fprintf(out,"#define YYERRORSYMBOL %d\n",lemp->errsym->index);  lineno++;
-  fprintf(out,"#define YYERRSYMDT yy%d\n",lemp->errsym->dtnum);  lineno++;
-  if( lemp->has_fallback ){
-    fprintf(out,"#define YYFALLBACK 1\n");  lineno++;
-  }
-  tplt_xfer(lemp->name,in,out,&lineno);
+    tplt_xfer(lemp->name, in, out, &lineno); // 2、遇到第二个双百分号就停止。然后根据mhflag 打印example.h头文件
 
-  /* Generate the action table and its associates:
-  **
-  **  yy_action[]        A single table containing all actions.
-  **  yy_lookahead[]     A table containing the lookahead for each entry in
-  **                     yy_action.  Used to detect hash collisions.
-  **  yy_shift_ofst[]    For each state, the offset into yy_action for
-  **                     shifting terminals.
-  **  yy_reduce_ofst[]   For each state, the offset into yy_action for
-  **                     shifting non-terminals after a reduce.
-  **  yy_default[]       Default action for each state.
-  */
-
-  /* Compute the actions on all states and count them up */
-  ax = malloc( sizeof(ax[0])*lemp->nstate*2 );
-  if( ax==0 ){
-    fprintf(stderr,"malloc failed\n");
-    exit(1);
-  }
-  for(i=0; i<lemp->nstate; i++){
-    stp = lemp->sorted[i];
-    stp->nTknAct = stp->nNtAct = 0;
-    stp->iDflt = lemp->nstate + lemp->nrule;
-    stp->iTknOfst = NO_OFFSET;
-    stp->iNtOfst = NO_OFFSET;
-    for(ap=stp->ap; ap; ap=ap->next){
-      if( compute_action(lemp,ap)>=0 ){
-        if( ap->sp->index<lemp->nterminal ){
-          stp->nTknAct++;
-        }else if( ap->sp->index<lemp->nsymbol ){
-          stp->nNtAct++;
-        }else{
-          stp->iDflt = compute_action(lemp, ap);
+    /* Generate #defines for all tokens */
+    if (mhflag) {
+        char *prefix;
+        fprintf(out, "#if INTERFACE\n");
+        lineno++;
+        if (lemp->tokenprefix) prefix = lemp->tokenprefix;
+        else prefix = "";
+        for (i = 1; i < lemp->nterminal; i++) {
+            fprintf(out, "#define %s%-30s %2d\n", prefix, lemp->symbols[i]->name, i);
+            lineno++;
         }
-      }
+        fprintf(out, "#endif\n");
+        lineno++; // FIXME:一般这种lineno++表示输出文件example.cpp 文件已经输出一行了,所以行数加1。。
     }
-    ax[i*2].stp = stp;
-    ax[i*2].isTkn = 1;
-    ax[i*2].nAction = stp->nTknAct;
-    ax[i*2+1].stp = stp;
-    ax[i*2+1].isTkn = 0;
-    ax[i*2+1].nAction = stp->nNtAct;
-  }
-  mxTknOfst = mnTknOfst = 0;
-  mxNtOfst = mnNtOfst = 0;
+    tplt_xfer(lemp->name, in, out, &lineno); // 3、遇到第三个双百分号就停止
 
-  /* Compute the action table.  In order to try to keep the size of the
-  ** action table to a minimum, the heuristic of placing the largest action
-  ** sets first is used.
-  */
-  qsort(ax, lemp->nstate*2, sizeof(ax[0]), axset_compare);
-  pActtab = acttab_alloc();
-  for(i=0; i<lemp->nstate*2 && ax[i].nAction>0; i++){
-    stp = ax[i].stp;
-    if( ax[i].isTkn ){
-      for(ap=stp->ap; ap; ap=ap->next){
-        int action;
-        if( ap->sp->index>=lemp->nterminal ) continue;
-        action = compute_action(lemp, ap);
-        if( action<0 ) continue;
-        acttab_action(pActtab, ap->sp->index, action);
-      }
-      stp->iTknOfst = acttab_insert(pActtab);
-      if( stp->iTknOfst<mnTknOfst ) mnTknOfst = stp->iTknOfst;
-      if( stp->iTknOfst>mxTknOfst ) mxTknOfst = stp->iTknOfst;
-    }else{
-      for(ap=stp->ap; ap; ap=ap->next){
-        int action;
-        if( ap->sp->index<lemp->nterminal ) continue;
-        if( ap->sp->index==lemp->nsymbol ) continue;
-        action = compute_action(lemp, ap);
-        if( action<0 ) continue;
-        acttab_action(pActtab, ap->sp->index, action);
-      }
-      stp->iNtOfst = acttab_insert(pActtab);
-      if( stp->iNtOfst<mnNtOfst ) mnNtOfst = stp->iNtOfst;
-      if( stp->iNtOfst>mxNtOfst ) mxNtOfst = stp->iNtOfst;
+    /* Generate the defines */
+    fprintf(out, "#define YYCODETYPE %s\n", // YYCODETYPE 类型指定了用一个整数来代表某个终结符或者非终结符
+            minimum_size_type(0, lemp->nsymbol + 5)); // 根据 lemp->nsymbol+5的值 得到类型。【unsigned char或者int或者等等】
+    lineno++;// FIXME:一般这种lineno++表示lempar.c文件已经处理掉了一个双百分号,所以行数加1。。
+    fprintf(out, "#define YYNOCODE %d\n", lemp->nsymbol + 1); // YYNOCODE 用来表示这一个非法的终结符或者一个非法的非终结符
+    lineno++;
+    fprintf(out, "#define YYACTIONTYPE %s\n", // YYACTIONTYPE 所有的状态跟产生式都用整数来表示了。
+            minimum_size_type(0, lemp->nstate + lemp->nrule + 5));
+    lineno++;
+    print_stack_union(out, lemp, &lineno, mhflag); // 打印分析栈中所使用的联合结构。
+    if (lemp->stacksize) { // 通过%stack_size 申明符 赋值。
+        if (atoi(lemp->stacksize) <= 0) {
+            ErrorMsg(lemp->filename, 0,
+                     "Illegal stack size: [%s].  The stack size should be an integer constant.",
+                     lemp->stacksize);
+            lemp->errorcnt++;
+            lemp->stacksize = "100";
+        }
+        fprintf(out, "#define YYSTACKDEPTH %s\n", lemp->stacksize);
+        lineno++;
+    } else {
+        fprintf(out, "#define YYSTACKDEPTH 100\n");
+        lineno++;
     }
-  }
-  free(ax);
-
-  /* Output the yy_action table */
-  fprintf(out,"static const YYACTIONTYPE yy_action[] = {\n"); lineno++;
-  n = acttab_size(pActtab);
-  for(i=j=0; i<n; i++){
-    int action = acttab_yyaction(pActtab, i);
-    if( action<0 ) action = lemp->nsymbol + lemp->nrule + 2;
-    if( j==0 ) fprintf(out," /* %5d */ ", i);
-    fprintf(out, " %4d,", action);
-    if( j==9 || i==n-1 ){
-      fprintf(out, "\n"); lineno++;
-      j = 0;
-    }else{
-      j++;
+    if (mhflag) {
+        fprintf(out, "#if INTERFACE\n");
+        lineno++;
     }
-  }
-  fprintf(out, "};\n"); lineno++;
-
-  /* Output the yy_lookahead table */
-  fprintf(out,"static const YYCODETYPE yy_lookahead[] = {\n"); lineno++;
-  for(i=j=0; i<n; i++){
-    int la = acttab_yylookahead(pActtab, i);
-    if( la<0 ) la = lemp->nsymbol;
-    if( j==0 ) fprintf(out," /* %5d */ ", i);
-    fprintf(out, " %4d,", la);
-    if( j==9 || i==n-1 ){
-      fprintf(out, "\n"); lineno++;
-      j = 0;
-    }else{
-      j++;
+    name = lemp->name ? lemp->name : "Parse";
+    if (lemp->arg && lemp->arg[0]) { // lemp->arg 是 %extra_argument申明符 带进来的。。。sqlite3的y文件就有这货。%extra_argument {Parse *pParse}
+        int i;
+        i = strlen(lemp->arg);
+        while (i >= 1 && isspace(lemp->arg[i - 1])) i--;
+        while (i >= 1 && (isalnum(lemp->arg[i - 1]) || lemp->arg[i - 1] == '_')) i--; // 得到
+        fprintf(out, "#define %sARG_SDECL %s;\n", name, lemp->arg);
+        lineno++;
+        fprintf(out, "#define %sARG_PDECL ,%s\n", name, lemp->arg);
+        lineno++;
+        fprintf(out, "#define %sARG_FETCH %s = yypParser->%s\n",
+                name, lemp->arg, &lemp->arg[i]); // lemp->arg是Parse *pParse, &lemp->arg[i]是pParse
+        lineno++;
+        fprintf(out, "#define %sARG_STORE yypParser->%s = %s\n",
+                name, &lemp->arg[i], &lemp->arg[i]);
+        lineno++;
+    } else {
+        fprintf(out, "#define %sARG_SDECL\n", name);
+        lineno++;
+        fprintf(out, "#define %sARG_PDECL\n", name);
+        lineno++;
+        fprintf(out, "#define %sARG_FETCH\n", name);
+        lineno++;
+        fprintf(out, "#define %sARG_STORE\n", name);
+        lineno++;
     }
-  }
-  fprintf(out, "};\n"); lineno++;
-
-  /* Output the yy_shift_ofst[] table */
-  fprintf(out, "#define YY_SHIFT_USE_DFLT (%d)\n", mnTknOfst-1); lineno++;
-  fprintf(out, "static const %s yy_shift_ofst[] = {\n", 
-          minimum_size_type(mnTknOfst-1, mxTknOfst)); lineno++;
-  n = lemp->nstate;
-  for(i=j=0; i<n; i++){
-    int ofst;
-    stp = lemp->sorted[i];
-    ofst = stp->iTknOfst;
-    if( ofst==NO_OFFSET ) ofst = mnTknOfst - 1;
-    if( j==0 ) fprintf(out," /* %5d */ ", i);
-    fprintf(out, " %4d,", ofst);
-    if( j==9 || i==n-1 ){
-      fprintf(out, "\n"); lineno++;
-      j = 0;
-    }else{
-      j++;
+    if (mhflag) {
+        fprintf(out, "#endif\n");
+        lineno++;
     }
-  }
-  fprintf(out, "};\n"); lineno++;
-
-  /* Output the yy_reduce_ofst[] table */
-  fprintf(out, "#define YY_REDUCE_USE_DFLT (%d)\n", mnNtOfst-1); lineno++;
-  fprintf(out, "static const %s yy_reduce_ofst[] = {\n", 
-          minimum_size_type(mnNtOfst-1, mxNtOfst)); lineno++;
-  n = lemp->nstate;
-  for(i=j=0; i<n; i++){
-    int ofst;
-    stp = lemp->sorted[i];
-    ofst = stp->iNtOfst;
-    if( ofst==NO_OFFSET ) ofst = mnNtOfst - 1;
-    if( j==0 ) fprintf(out," /* %5d */ ", i);
-    fprintf(out, " %4d,", ofst);
-    if( j==9 || i==n-1 ){
-      fprintf(out, "\n"); lineno++;
-      j = 0;
-    }else{
-      j++;
+    fprintf(out, "#define YYNSTATE %d\n", lemp->nstate);
+    lineno++;
+    fprintf(out, "#define YYNRULE %d\n", lemp->nrule);
+    lineno++;
+    fprintf(out, "#define YYERRORSYMBOL %d\n", lemp->errsym->index);
+    lineno++;
+    fprintf(out, "#define YYERRSYMDT yy%d\n", lemp->errsym->dtnum);
+    lineno++;
+    if (lemp->has_fallback) { // %fallback申明符。。sqlite3就有这货。%fallback ID
+        fprintf(out, "#define YYFALLBACK 1\n");
+        lineno++;
     }
-  }
-  fprintf(out, "};\n"); lineno++;
+    tplt_xfer(lemp->name, in, out, &lineno); // 4、继续去lempar.c文件里面读数据 拷贝过来 输出到example.cpp。 因为 第四个双百分号的出现 而停止返回了
 
-  /* Output the default action table */
-  fprintf(out, "static const YYACTIONTYPE yy_default[] = {\n"); lineno++;
-  n = lemp->nstate;
-  for(i=j=0; i<n; i++){
-    stp = lemp->sorted[i];
-    if( j==0 ) fprintf(out," /* %5d */ ", i);
-    fprintf(out, " %4d,", stp->iDflt);
-    if( j==9 || i==n-1 ){
-      fprintf(out, "\n"); lineno++;
-      j = 0;
-    }else{
-      j++;
+    /* Generate the action table and its associates:
+    **
+    **  yy_action[]        A single table containing all actions.
+    **  yy_lookahead[]     A table containing the lookahead for each entry in
+    **                     yy_action.  Used to detect hash collisions.
+    **  yy_shift_ofst[]    For each state, the offset into yy_action for
+    **                     shifting terminals.
+    **  yy_reduce_ofst[]   For each state, the offset into yy_action for
+    **                     shifting non-terminals after a reduce.
+    **  yy_default[]       Default action for each state.
+    */
+    // 第四个双百分号要干的事情:建立一个一维的yy_action[]数组。。当大家用表示分析器状态state的整数和表示先行符号lookahead的整数,来向这个数组检索的时候,它应该返回相应的动作。
+    /* Compute the actions on all states and count them up */ // 核心公式:N=yy_action[yy_shift_ofst[S]+X] //两个数组,S表示状态,X表示先行符。
+    ax = malloc(sizeof(ax[0]) * lemp->nstate * 2); // axset结构体
+    if (ax == 0) {
+        fprintf(stderr, "malloc failed\n");
+        exit(1);
     }
-  }
-  fprintf(out, "};\n"); lineno++;
-  tplt_xfer(lemp->name,in,out,&lineno);
-
-  /* Generate the table of fallback tokens.
-  */
-  if( lemp->has_fallback ){
-    for(i=0; i<lemp->nterminal; i++){
-      struct symbol *p = lemp->symbols[i];
-      if( p->fallback==0 ){
-        fprintf(out, "    0,  /* %10s => nothing */\n", p->name);
-      }else{
-        fprintf(out, "  %3d,  /* %10s => %s */\n", p->fallback->index,
-          p->name, p->fallback->name);
-      }
-      lineno++;
+    for (i = 0; i < lemp->nstate; i++) {
+        stp = lemp->sorted[i];
+        stp->nTknAct = stp->nNtAct = 0; // nTknAct含义是此状态中与终结符先联系的动作数目 nNtAct含义是此状态中与非终结符先联系的动作数目
+        stp->iDflt = lemp->nstate + lemp->nrule; // iDflt是默认的动作
+        stp->iTknOfst = NO_OFFSET; // NO_OFFSET是一个很小很小的负数
+        stp->iNtOfst = NO_OFFSET;
+        for (ap = stp->ap; ap; ap = ap->next) { // ap就是此状态下的动作链表,就是所谓的分析链表
+            if (compute_action(lemp, ap) >= 0) {   // 移进 规约 错误 接受 就会返回一个值,该值不小于0。。TODO compute_action很简单,就是计算下当前action先行符的index
+                if (ap->sp->index < lemp->nterminal) { // sp就是先行符号,先看看先行符的下标值是否小于终结符总数量。是的话,表示该先行符是终结符
+                    stp->nTknAct++;
+                } else if (ap->sp->index < lemp->nsymbol) { // sp就是先行符号,先看看先行符的下标值是否大于终结符总数量而小于文法符号总数量。是的话,表示该先行符是非终结符
+                    stp->nNtAct++;
+                } else {
+                    stp->iDflt = compute_action(lemp, ap); // 其他情况,只能考虑{default}的情况了。
+                }
+            }
+        } // 开始填充ax数组的各个元素。
+        ax[i * 2].stp = stp;
+        ax[i * 2].isTkn = 1;
+        ax[i * 2].nAction = stp->nTknAct;
+        ax[i * 2 + 1].stp = stp;
+        ax[i * 2 + 1].isTkn = 0;
+        ax[i * 2 + 1].nAction = stp->nNtAct; // 如此一来,每两个相邻的ax元素,一个跟终结符相关,一个跟非终结符相关
     }
-  }
-  tplt_xfer(lemp->name, in, out, &lineno);
-
-  /* Generate a table containing the symbolic name of every symbol
-  */
-  for(i=0; i<lemp->nsymbol; i++){
-    sprintf(line,"\"%s\",",lemp->symbols[i]->name);
-    fprintf(out,"  %-15s",line);
-    if( (i&3)==3 ){ fprintf(out,"\n"); lineno++; }
-  }
-  if( (i&3)!=0 ){ fprintf(out,"\n"); lineno++; }
-  tplt_xfer(lemp->name,in,out,&lineno);
-
-  /* Generate a table containing a text string that describes every
-  ** rule in the rule set of the grammer.  This information is used
-  ** when tracing REDUCE actions.
-  */
-  for(i=0, rp=lemp->rule; rp; rp=rp->next, i++){
-    assert( rp->index==i );
-    fprintf(out," /* %3d */ \"%s ::=", i, rp->lhs->name);
-    for(j=0; j<rp->nrhs; j++) fprintf(out," %s",rp->rhs[j]->name);
-    fprintf(out,"\",\n"); lineno++;
-  }
-  tplt_xfer(lemp->name,in,out,&lineno);
-
-  /* Generate code which executes every time a symbol is popped from
-  ** the stack while processing errors or while destroying the parser. 
-  ** (In other words, generate the %destructor actions)
-  */
-  if( lemp->tokendest ){
-    for(i=0; i<lemp->nsymbol; i++){
-      struct symbol *sp = lemp->symbols[i];
-      if( sp==0 || sp->type!=TERMINAL ) continue;
-      fprintf(out,"    case %d:\n",sp->index); lineno++;
+    mxTknOfst = mnTknOfst = 0;
+    mxNtOfst = mnNtOfst = 0; // TODO 个人感觉 后面这段代码最难理解。。。压缩二维数组表
+    // 下面的代码 就是建立动作表。。也就是所谓的分析表了。首先建立的动作表的尺寸是最大的,然后让计算机自动的搜索,以求最大限度地减少动作表的尺寸。最大的动作表就是ax数组。最小的动作表就是会变化的aAction数组
+    /* Compute the action table.  In order to try to keep the size of the
+    ** action table to a minimum, the heuristic of placing the largest action
+    ** sets first is used.
+    */ // acttab_action创建alookahead数组。acttab_insert创建yy_action数组
+    qsort(ax, lemp->nstate * 2, sizeof(ax[0]), axset_compare); // 先排序。。按照ax元素的动作总数【nAction字段】进行排序,多的在前,少的在后
+    pActtab = acttab_alloc(); // acttab 结构体pActtab,,承载运转器!!。。里面有两个重要的数组。aAction跟aLookahead数组。
+    for (i = 0; i < lemp->nstate * 2 && ax[i].nAction > 0; i++) { // 由于ax是排过序的,所以 当遇到nAction的值是0的时候,后面的那些ax元素的nAction值肯定都是0
+        stp = ax[i].stp;
+        if (ax[i].isTkn) { // isTkn表示这个ax是 跟终结符相关的 结构体。
+            for (ap = stp->ap; ap; ap = ap->next) {
+                int action;
+                if (ap->sp->index >= lemp->nterminal) continue; // 先行符不是终结符就忽略
+                action = compute_action(lemp, ap);
+                if (action < 0) continue; // 当action值小于0,说明不是 移进 规约 出错 接受中的任何一种。conflict sh_resolved rd_resolved not_used 都被过滤了
+                acttab_action(pActtab, ap->sp->index, action); // 属于四大【移进 规约 出错 接受】中的一种。开始装配acttab_action TODO
+            }
+            stp->iTknOfst = acttab_insert(pActtab); // 得到一个相对于yy_action数组首部首地址的偏移量。iTknOfst
+            if (stp->iTknOfst < mnTknOfst) mnTknOfst = stp->iTknOfst;
+            if (stp->iTknOfst > mxTknOfst) mxTknOfst = stp->iTknOfst;
+        } else { // isTkn=false表示这个ax是 跟非终结符相关的 结构体。
+            for (ap = stp->ap; ap; ap = ap->next) {
+                int action;
+                if (ap->sp->index < lemp->nterminal) continue; // 先行符是终结符就忽略
+                if (ap->sp->index == lemp->nsymbol) continue;
+                action = compute_action(lemp, ap);
+                if (action < 0) continue;
+                acttab_action(pActtab, ap->sp->index, action);
+            }
+            stp->iNtOfst = acttab_insert(pActtab);
+            if (stp->iNtOfst < mnNtOfst) mnNtOfst = stp->iNtOfst;
+            if (stp->iNtOfst > mxNtOfst) mxNtOfst = stp->iNtOfst;
+        }
     }
-    for(i=0; i<lemp->nsymbol && lemp->symbols[i]->type!=TERMINAL; i++);
-    if( i<lemp->nsymbol ){
-      emit_destructor_code(out,lemp->symbols[i],lemp,&lineno);
-      fprintf(out,"      break;\n"); lineno++;
+    free(ax); // 最小的动作表构建结束了。。那么最大的动作表ax就没用了,可以删了
+
+    /* Output the yy_action table */ // 输出yy——action表
+    fprintf(out, "static const YYACTIONTYPE yy_action[] = {\n");
+    lineno++;
+    n = acttab_size(pActtab);
+    for (i = j = 0; i < n; i++) {
+        int action = acttab_yyaction(pActtab, i);
+        if (action < 0) action = lemp->nsymbol + lemp->nrule + 2; // 不存在,就使用nsymbol_nrule+2这个大值 来赋值。。
+        if (j == 0) fprintf(out, " /* %5d */ ", i);
+        fprintf(out, " %4d,", action);
+        if (j == 9 || i == n - 1) {
+            fprintf(out, "\n");
+            lineno++;
+            j = 0;
+        } else {
+            j++;
+        }
     }
-  }
-  if( lemp->vardest ){
-    struct symbol *dflt_sp = 0;
-    for(i=0; i<lemp->nsymbol; i++){
-      struct symbol *sp = lemp->symbols[i];
-      if( sp==0 || sp->type==TERMINAL ||
-          sp->index<=0 || sp->destructor!=0 ) continue;
-      fprintf(out,"    case %d:\n",sp->index); lineno++;
-      dflt_sp = sp;
+    fprintf(out, "};\n");
+    lineno++;
+
+    /* Output the yy_lookahead table */ // 输出yy_lookahead表
+    fprintf(out, "static const YYCODETYPE yy_lookahead[] = {\n");
+    lineno++;
+    for (i = j = 0; i < n; i++) {
+        int la = acttab_yylookahead(pActtab, i);
+        if (la < 0) la = lemp->nsymbol;
+        if (j == 0) fprintf(out, " /* %5d */ ", i);
+        fprintf(out, " %4d,", la);
+        if (j == 9 || i == n - 1) {
+            fprintf(out, "\n");
+            lineno++;
+            j = 0;
+        } else {
+            j++;
+        }
     }
-    if( dflt_sp!=0 ){
-      emit_destructor_code(out,dflt_sp,lemp,&lineno);
-      fprintf(out,"      break;\n"); lineno++;
+    fprintf(out, "};\n");
+    lineno++;
+
+    /* Output the yy_shift_ofst[] table */ // 应用yy_shift_ofst数组的适用范围是终结符。。。遇到终结符就shift。
+    fprintf(out, "#define YY_SHIFT_USE_DFLT (%d)\n", mnTknOfst - 1);
+    lineno++;
+    fprintf(out, "static const %s yy_shift_ofst[] = {\n",
+            minimum_size_type(mnTknOfst - 1, mxTknOfst));
+    lineno++;
+    n = lemp->nstate;
+    for (i = j = 0; i < n; i++) {
+        int ofst;
+        stp = lemp->sorted[i];
+        ofst = stp->iTknOfst;
+        if (ofst == NO_OFFSET) ofst = mnTknOfst - 1;
+        if (j == 0) fprintf(out, " /* %5d */ ", i);
+        fprintf(out, " %4d,", ofst); // ofst = mnTknOfst - 1;
+        if (j == 9 || i == n - 1) {
+            fprintf(out, "\n");
+            lineno++;
+            j = 0;
+        } else {
+            j++;
+        }
     }
-  }
-  for(i=0; i<lemp->nsymbol; i++){
-    struct symbol *sp = lemp->symbols[i];
-    if( sp==0 || sp->type==TERMINAL || sp->destructor==0 ) continue;
-    fprintf(out,"    case %d:\n",sp->index); lineno++;
+    fprintf(out, "};\n");
+    lineno++;
 
-    /* Combine duplicate destructors into a single case */
-    for(j=i+1; j<lemp->nsymbol; j++){
-      struct symbol *sp2 = lemp->symbols[j];
-      if( sp2 && sp2->type!=TERMINAL && sp2->destructor
-          && sp2->dtnum==sp->dtnum
-          && strcmp(sp->destructor,sp2->destructor)==0 ){
-         fprintf(out,"    case %d:\n",sp2->index); lineno++;
-         sp2->destructor = 0;
-      }
+    /* Output the yy_reduce_ofst[] table */ // 应用yy_reduce_ofst数组的适用范围是非终结符。。。找到偏移量。。遇到非终结符就reduce。
+    fprintf(out, "#define YY_REDUCE_USE_DFLT (%d)\n", mnNtOfst - 1);
+    lineno++;
+    fprintf(out, "static const %s yy_reduce_ofst[] = {\n",
+            minimum_size_type(mnNtOfst - 1, mxNtOfst));
+    lineno++;
+    n = lemp->nstate;
+    for (i = j = 0; i < n; i++) {
+        int ofst;
+        stp = lemp->sorted[i];
+        ofst = stp->iNtOfst;
+        if (ofst == NO_OFFSET) ofst = mnNtOfst - 1;
+        if (j == 0) fprintf(out, " /* %5d */ ", i);
+        fprintf(out, " %4d,", ofst);
+        if (j == 9 || i == n - 1) {
+            fprintf(out, "\n");
+            lineno++;
+            j = 0;
+        } else {
+            j++;
+        }
     }
+    fprintf(out, "};\n");
+    lineno++;
 
-    emit_destructor_code(out,lemp->symbols[i],lemp,&lineno);
-    fprintf(out,"      break;\n"); lineno++;
-  }
-  tplt_xfer(lemp->name,in,out,&lineno);
-
-  /* Generate code which executes whenever the parser stack overflows */
-  tplt_print(out,lemp,lemp->overflow,lemp->overflowln,&lineno);
-  tplt_xfer(lemp->name,in,out,&lineno);
-
-  /* Generate the table of rule information 
-  **
-  ** Note: This code depends on the fact that rules are number
-  ** sequentually beginning with 0.
-  */
-  for(rp=lemp->rule; rp; rp=rp->next){
-    fprintf(out,"  { %d, %d },\n",rp->lhs->index,rp->nrhs); lineno++;
-  }
-  tplt_xfer(lemp->name,in,out,&lineno);
-
-  /* Generate code which execution during each REDUCE action */
-  for(rp=lemp->rule; rp; rp=rp->next){
-    if( rp->code ) translate_code(lemp, rp);
-  }
-  for(rp=lemp->rule; rp; rp=rp->next){
-    struct rule *rp2;
-    if( rp->code==0 ) continue;
-    fprintf(out,"      case %d:\n",rp->index); lineno++;
-    for(rp2=rp->next; rp2; rp2=rp2->next){
-      if( rp2->code==rp->code ){
-        fprintf(out,"      case %d:\n",rp2->index); lineno++;
-        rp2->code = 0;
-      }
+    /* Output the default action table */ // 打印default动作
+    fprintf(out, "static const YYACTIONTYPE yy_default[] = {\n");
+    lineno++;
+    n = lemp->nstate;
+    for (i = j = 0; i < n; i++) {
+        stp = lemp->sorted[i];
+        if (j == 0) fprintf(out, " /* %5d */ ", i);
+        fprintf(out, " %4d,", stp->iDflt);
+        if (j == 9 || i == n - 1) {
+            fprintf(out, "\n");
+            lineno++;
+            j = 0;
+        } else {
+            j++;
+        }
     }
-    emit_code(out,rp,lemp,&lineno);
-    fprintf(out,"        break;\n"); lineno++;
-  }
-  tplt_xfer(lemp->name,in,out,&lineno);
+    fprintf(out, "};\n");
+    lineno++;
+    tplt_xfer(lemp->name, in, out, &lineno); // 5、继续去lempar.c文件里面读数据 拷贝过来 输出到example.cpp。 因为 第五个双百分号的出现而停止
 
-  /* Generate code which executes if a parse fails */
-  tplt_print(out,lemp,lemp->failure,lemp->failureln,&lineno);
-  tplt_xfer(lemp->name,in,out,&lineno);
+    /* Generate the table of fallback tokens.
+    */
+    if (lemp->has_fallback) {
+        for (i = 0; i < lemp->nterminal; i++) {
+            struct symbol *p = lemp->symbols[i];
+            if (p->fallback == 0) {
+                fprintf(out, "    0,  /* %10s => nothing */\n", p->name);
+            } else {
+                fprintf(out, "  %3d,  /* %10s => %s */\n", p->fallback->index,
+                        p->name, p->fallback->name);
+            }
+            lineno++;
+        }
+    }
+    tplt_xfer(lemp->name, in, out, &lineno);  // 6、继续去lempar.c文件里面读数据 拷贝过来 输出到example.cpp。 因为 第六个双百分号的出现而停止
 
-  /* Generate code which executes when a syntax error occurs */
-  tplt_print(out,lemp,lemp->error,lemp->errorln,&lineno);
-  tplt_xfer(lemp->name,in,out,&lineno);
+    /* Generate a table containing the symbolic name of every symbol
+    */ // 第六个百分号干的事情就是: 输出包括$ 跟error 在内的终结符号。
+    for (i = 0; i < lemp->nsymbol; i++) {
+        sprintf(line, "\"%s\",", lemp->symbols[i]->name);
+        fprintf(out, "  %-15s", line);
+        if ((i & 3) == 3) {
+            fprintf(out, "\n");
+            lineno++;
+        }
+    }
+    if ((i & 3) != 0) {
+        fprintf(out, "\n");
+        lineno++;
+    }
+    tplt_xfer(lemp->name, in, out, &lineno); // 7、继续去lempar.c文件里面读数据 拷贝过来 输出到example.cpp。 因为 第七个双百分号的出现而停止
 
-  /* Generate code which executes when the parser accepts its input */
-  tplt_print(out,lemp,lemp->accept,lemp->acceptln,&lineno);
-  tplt_xfer(lemp->name,in,out,&lineno);
+    /* Generate a table containing a text string that describes every
+    ** rule in the rule set of the grammer.  This information is used
+    ** when tracing REDUCE actions.
+    */  // 第七个百分号干的事情就是: 输出所有的产生式。
+    for (i = 0, rp = lemp->rule; rp; rp = rp->next, i++) {
+        assert(rp->index == i);
+        fprintf(out, " /* %3d */ \"%s ::=", i, rp->lhs->name);
+        for (j = 0; j < rp->nrhs; j++) fprintf(out, " %s", rp->rhs[j]->name);
+        fprintf(out, "\",\n");
+        lineno++;
+    }
+    tplt_xfer(lemp->name, in, out, &lineno); // 8、继续去lempar.c文件里面读数据 拷贝过来 输出到example.cpp.因为 第八个双百分号的出现而停止
 
-  /* Append any addition code the user desires */
-  tplt_print(out,lemp,lemp->extracode,lemp->extracodeln,&lineno);
+    /* Generate code which executes every time a symbol is popped from
+    ** the stack while processing errors or while destroying the parser.
+    ** (In other words, generate the %destructor actions)
+    */ // 第八个百分号干的事情就是:yy_destructor函数  。
+    if (lemp->tokendest) {
+        for (i = 0; i < lemp->nsymbol; i++) {
+            struct symbol *sp = lemp->symbols[i];
+            if (sp == 0 || sp->type != TERMINAL) continue;
+            fprintf(out, "    case %d:\n", sp->index);
+            lineno++;
+        }
+        for (i = 0; i < lemp->nsymbol && lemp->symbols[i]->type != TERMINAL; i++);
+        if (i < lemp->nsymbol) {
+            emit_destructor_code(out, lemp->symbols[i], lemp, &lineno);
+            fprintf(out, "      break;\n");
+            lineno++;
+        }
+    }
+    if (lemp->vardest) {
+        struct symbol *dflt_sp = 0;
+        for (i = 0; i < lemp->nsymbol; i++) {
+            struct symbol *sp = lemp->symbols[i];
+            if (sp == 0 || sp->type == TERMINAL ||
+                sp->index <= 0 || sp->destructor != 0)
+                continue;
+            fprintf(out, "    case %d:\n", sp->index);
+            lineno++;
+            dflt_sp = sp;
+        }
+        if (dflt_sp != 0) {
+            emit_destructor_code(out, dflt_sp, lemp, &lineno);
+            fprintf(out, "      break;\n");
+            lineno++;
+        }
+    }
+    for (i = 0; i < lemp->nsymbol; i++) {
+        struct symbol *sp = lemp->symbols[i];
+        if (sp == 0 || sp->type == TERMINAL || sp->destructor == 0) continue;
+        fprintf(out, "    case %d:\n", sp->index);
+        lineno++;
 
-  fclose(in);
-  fclose(out);
-  return;
+        /* Combine duplicate destructors into a single case */
+        for (j = i + 1; j < lemp->nsymbol; j++) {
+            struct symbol *sp2 = lemp->symbols[j];
+            if (sp2 && sp2->type != TERMINAL && sp2->destructor
+                && sp2->dtnum == sp->dtnum
+                && strcmp(sp->destructor, sp2->destructor) == 0) {
+                fprintf(out, "    case %d:\n", sp2->index);
+                lineno++;
+                sp2->destructor = 0;
+            }
+        }
+
+        emit_destructor_code(out, lemp->symbols[i], lemp, &lineno);
+        fprintf(out, "      break;\n");
+        lineno++;
+    }
+    tplt_xfer(lemp->name, in, out, &lineno); // 9、继续去lempar.c文件里面读数据 拷贝过来 输出到example.cpp.因为 第9个双百分号的出现而stop
+
+    /* Generate code which executes whenever the parser stack overflows */
+    tplt_print(out, lemp, lemp->overflow, lemp->overflowln, &lineno); // 第九个百分号是处理 overflow 的代码。。
+    tplt_xfer(lemp->name, in, out, &lineno); // 10、继续去lempar.c文件里面读数据 拷贝过来 输出到example.cpp.因为 第10个双百分号的出现而stop
+
+    /* Generate the table of rule information
+    **
+    ** Note: This code depends on the fact that rules are number
+    ** sequentually beginning with 0.
+    */ // 第10个百分号的作用是: 输出产生式的左边符号index  跟右边符号的总数量。
+    for (rp = lemp->rule; rp; rp = rp->next) {
+        fprintf(out, "  { %d, %d },\n", rp->lhs->index, rp->nrhs);
+        lineno++;
+    }
+    tplt_xfer(lemp->name, in, out, &lineno); // 11、继续去lempar.c文件里面读数据 拷贝过来 输出到example.cpp.因为 第11个双百分号的出现而stop
+
+    /* Generate code which execution during each REDUCE action */ // 第十一个百分号的作用就是  输出reduce对应的那个产生式的的代码。。。
+    for (rp = lemp->rule; rp; rp = rp->next) {
+        if (rp->code) translate_code(lemp, rp);
+    }
+    for (rp = lemp->rule; rp; rp = rp->next) {
+        struct rule *rp2;
+        if (rp->code == 0) continue;
+        fprintf(out, "      case %d:\n", rp->index);
+        lineno++;
+        for (rp2 = rp->next; rp2; rp2 = rp2->next) {
+            if (rp2->code == rp->code) {
+                fprintf(out, "      case %d:\n", rp2->index);
+                lineno++;
+                rp2->code = 0;
+            }
+        }
+        emit_code(out, rp, lemp, &lineno); // 输出y文件中的那个reduce对应的那个产生式的的代码。。
+        fprintf(out, "        break;\n");
+        lineno++;
+    }
+    tplt_xfer(lemp->name, in, out, &lineno); // 12、继续去lempar.c文件里面读数据 拷贝过来 输出到example.cpp.因为 第12个双百分号的出现
+
+    /* Generate code which executes if a parse fails */ //第12个双百分号:输出fail code
+    tplt_print(out, lemp, lemp->failure, lemp->failureln, &lineno);
+    tplt_xfer(lemp->name, in, out, &lineno);  // 13、继续去lempar.c文件里面读数据 拷贝过来 输出到example.cpp.因为 第13个双百分号的出现
+
+    /* Generate code which executes when a syntax error occurs */
+    tplt_print(out, lemp, lemp->error, lemp->errorln, &lineno);  //第13个双百分号:输出error code
+    tplt_xfer(lemp->name, in, out, &lineno); // 14、继续去lempar.c文件里面读数据 拷贝过来 输出到example.cpp.因为 第14个双百分号的出现
+
+    /* Generate code which executes when the parser accepts its input */
+    tplt_print(out, lemp, lemp->accept, lemp->acceptln, &lineno); // //第14个双百分号:输出accept code
+    tplt_xfer(lemp->name, in, out, &lineno); // 没有第十五个双百分号了。15、继续去lempar.c文件里面读数据 拷贝过来 输出到example.cpp. 最后就是lempar.c文件的结尾了。
+
+    /* Append any addition code the user desires */  // //最后的最后,输出%code申明符号的code 到example.cpp文件。
+    tplt_print(out, lemp, lemp->extracode, lemp->extracodeln, &lineno);
+
+    fclose(in); // 关闭文件。。。
+    fclose(out);
+    return;
 }
 
 /* Generate a header file for the parser */
 void ReportHeader(struct lemon *lemp)
 //struct lemon *lemp;
 {
-  FILE *out, *in;
-  char *prefix;
-  char line[LINESIZE];
-  char pattern[LINESIZE];
-  int i;
+    FILE *out, *in;
+    char *prefix;
+    char line[LINESIZE];
+    char pattern[LINESIZE];
+    int i;
 
-  if( lemp->tokenprefix ) prefix = lemp->tokenprefix;
-  else                    prefix = "";
-  in = file_open(lemp,".h","rb");
-  if( in ){
-    for(i=1; i<lemp->nterminal && fgets(line,LINESIZE,in); i++){
-      sprintf(pattern,"#define %s%-30s %2d\n",prefix,lemp->symbols[i]->name,i);
-      if( strcmp(line,pattern) ) break;
+    if (lemp->tokenprefix) prefix = lemp->tokenprefix;
+    else prefix = "";
+    in = file_open(lemp, ".h", "rb");
+    if (in) {
+        for (i = 1; i < lemp->nterminal && fgets(line, LINESIZE, in); i++) {
+            sprintf(pattern, "#define %s%-30s %2d\n", prefix, lemp->symbols[i]->name, i);
+            if (strcmp(line, pattern)) break;
+        }
+        fclose(in);
+        if (i == lemp->nterminal) {
+            /* No change in the file.  Don't rewrite it. */
+            return;
+        }
     }
-    fclose(in);
-    if( i==lemp->nterminal ){
-      /* No change in the file.  Don't rewrite it. */
-      return;
+    out = file_open(lemp, ".h", "wb");
+    if (out) {
+        for (i = 1; i < lemp->nterminal; i++) {
+            fprintf(out, "#define %s%-30s %2d\n", prefix, lemp->symbols[i]->name, i);
+        }
+        fclose(out);
     }
-  }
-  out = file_open(lemp,".h","wb");
-  if( out ){
-    for(i=1; i<lemp->nterminal; i++){
-      fprintf(out,"#define %s%-30s %2d\n",prefix,lemp->symbols[i]->name,i);
-    }
-    fclose(out);  
-  }
-  return;
+    return;
 }
 
 /* Reduce the size of the action tables, if possible, by making use
@@ -3792,53 +3863,53 @@ void ReportHeader(struct lemon *lemp)
 ** In this version, we take the most frequent REDUCE action and make
 ** it the default.  Only default a reduce if there are more than one.
 */
-void CompressTables(lemp)
-struct lemon *lemp;
+void CompressTables(struct lemon *lemp) // 压缩链表
+//struct lemon *lemp;
 {
-  struct state *stp;
-  struct action *ap, *ap2;
-  struct rule *rp, *rp2, *rbest;
-  int nbest, n;
-  int i;
+    struct state *stp;
+    struct action *ap, *ap2;
+    struct rule *rp, *rp2, *rbest;
+    int nbest, n;
+    int i;
 
-  for(i=0; i<lemp->nstate; i++){
-    stp = lemp->sorted[i];
-    nbest = 0;
-    rbest = 0;
+    for (i = 0; i < lemp->nstate; i++) {
+        stp = lemp->sorted[i];
+        nbest = 0; // 计数器
+        rbest = 0; // 最佳产生式
+        // // ap是 每个状态 的Action动作列表【针对终结符】+Goto移进表【针对非终结符】。。统称为动作链表,我们更喜欢叫它做分析表。。。【所以发现其实编译原理里面的好多名词都没怎么细分】
+        for (ap = stp->ap; ap; ap = ap->next) {
+            if (ap->type != REDUCE) continue;
+            rp = ap->x.rp; // rp是产生式。。因为进来的只能可能是规约类型的。
+            if (rp == rbest) continue;
+            n = 1;
+            for (ap2 = ap->next; ap2; ap2 = ap2->next) {
+                if (ap2->type != REDUCE) continue;
+                rp2 = ap2->x.rp; // // rp是产生式。。因为进来的只能可能是规约类型的。
+                if (rp2 == rbest) continue;
+                if (rp2 == rp) n++; // 当发现两条产生式是一样的时候,。。就是说,我们在同一状态中,发现了具有同一产生式的两个规约动作
+            }
+            if (n > nbest) {
+                nbest = n;
+                rbest = rp;
+            }
+        }
+        // 走到这里,就得到了那条最佳产生式rbest跟他出现的次数nbest了。。。
+        /* Do not make a default if the number of rules to default
+        ** is not at least 2 */
+        if (nbest < 2) continue; // 如果最佳产生式的数量少于2,即是说所有的规约动作分别 只有一条产生式的时候,就 无所谓默认的产生式了。
 
-    for(ap=stp->ap; ap; ap=ap->next){
-      if( ap->type!=REDUCE ) continue;
-      rp = ap->x.rp;
-      if( rp==rbest ) continue;
-      n = 1;
-      for(ap2=ap->next; ap2; ap2=ap2->next){
-        if( ap2->type!=REDUCE ) continue;
-        rp2 = ap2->x.rp;
-        if( rp2==rbest ) continue;
-        if( rp2==rp ) n++;
-      }
-      if( n>nbest ){
-        nbest = n;
-        rbest = rp;
-      }
-    }
- 
-    /* Do not make a default if the number of rules to default
-    ** is not at least 2 */
-    if( nbest<2 ) continue;
 
-
-    /* Combine matching REDUCE actions into a single default */
-    for(ap=stp->ap; ap; ap=ap->next){
-      if( ap->type==REDUCE && ap->x.rp==rbest ) break;
-    }
-    assert( ap );
-    ap->sp = Symbol_new("{default}");
-    for(ap=ap->next; ap; ap=ap->next){
-      if( ap->type==REDUCE && ap->x.rp==rbest ) ap->type = NOT_USED;
-    }
-    stp->ap = Action_sort(stp->ap);
-  }
+        /* Combine matching REDUCE actions into a single default */
+        for (ap = stp->ap; ap; ap = ap->next) {
+            if (ap->type == REDUCE && ap->x.rp == rbest) break;
+        }
+        assert(ap);
+        ap->sp = Symbol_new("{default}"); // 设置默认动作, 不管原名是什么,通通改成{default}
+        for (ap = ap->next; ap; ap = ap->next) {
+            if (ap->type == REDUCE && ap->x.rp == rbest) ap->type = NOT_USED; // 把reduce到最佳产生式的那些动作 的type都改成NOT_USED
+        }
+        stp->ap = Action_sort(stp->ap); // 由于有些type改成了not_used 所以 对同一状态下面的所有action 动作 都进行重新排序
+    } // 由于{default}开头符号{的ASCII码比任何字母都大,所以{default}作为先行符号的时候,{所在的动作节点都被排在ap链表的最后面。// FIXME 所以当搜索动作从ap链表的链首逐个移动过来的时候,排除了一个个与特定符号相关联的动作之后,才会碰到它。至此,也不用再往后面移动了。
 }
 
 /***************** From the file "set.c" ************************************/

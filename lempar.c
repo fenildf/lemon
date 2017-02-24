@@ -4,7 +4,7 @@
 /* First off, code is include which follows the "include" declaration
 ** in the input file. */
 #include <stdio.h>
-%%
+%% // 第一个%%用来放输出文件example.cpp的include头。。其实每个百分号的前面那段注释就是讲明了该干的内容
 /* Next is all token values, in a form suitable for use by makeheaders.
 ** This section will be null unless lemon is run with the -m switch.
 */
@@ -15,7 +15,7 @@
 **
 ** Each symbol here is a terminal symbol in the grammar.
 */
-%%
+%% // 第二个%% 根据mhflag的值 输出头文件example.h
 /* Make sure the INTERFACE macro is defined.
 */
 #ifndef INTERFACE
@@ -54,7 +54,7 @@
 **    YYERRORSYMBOL      is the code number of the error symbol.  If not
 **                       defined, then do no error processing.
 */
-%%
+%% // 第三个%%  定义YYCODETYPE跟YYNOCODE等宏定义
 #define YY_NO_ACTION      (YYNSTATE+YYNRULE+2)
 #define YY_ACCEPT_ACTION  (YYNSTATE+YYNRULE+1)
 #define YY_ERROR_ACTION   (YYNSTATE+YYNRULE)
@@ -106,7 +106,7 @@
 **                     shifting non-terminals after a reduce.
 **  yy_default[]       Default action for each state.
 */
-%%
+%% // 第四个双百分号,二维数组线性化与压缩。
 #define YY_SZ_ACTTAB (sizeof(yy_action)/sizeof(yy_action[0]))
 
 /* The next table maps tokens into fallback tokens.  If a construct
@@ -121,7 +121,7 @@
 */
 #ifdef YYFALLBACK
 static const YYCODETYPE yyFallback[] = {
-%%
+%% // 第五个双百分号,处理fallback。。降级为 标识符、、
 };
 #endif /* YYFALLBACK */
 
@@ -137,26 +137,26 @@ static const YYCODETYPE yyFallback[] = {
 **      the information used by the action routines in the grammar.
 **      It is sometimes called the "minor" token.
 */
-struct yyStackEntry {
+struct yyStackEntry { // 入栈的 栈内元素结构体
   int stateno;       /* The state-number */
-  int major;         /* The major token value.  This is the code
+  int major;         /* The major token value.  This is the code  // 大标记
                      ** number for the token at this stack level */
-  YYMINORTYPE minor; /* The user-supplied minor token value.  This
+  YYMINORTYPE minor; /* The user-supplied minor token value.  This // 小标记。。其实就是 一个值
                      ** is the value of the token  */
 };
 typedef struct yyStackEntry yyStackEntry;
 
 /* The state of the parser is completely contained in an instance of
 ** the following structure */
-struct yyParser {
+struct yyParser { // 语法分析栈。
   int yyidx;                    /* Index of top element in stack */
   int yyerrcnt;                 /* Shifts left before out of the error */
-  ParseARG_SDECL                /* A place to hold %extra_argument */
+  ParseARG_SDECL                /* A place to hold %extra_argument */ // %extra_argument 定义的东西
   yyStackEntry yystack[YYSTACKDEPTH];  /* The parser's stack */
 };
 typedef struct yyParser yyParser;
 
-#ifndef NDEBUG
+#ifndef NDEBUG // 定义了debug行为。。。就是以前常见的ParserTrace函数。
 #include <stdio.h>
 static FILE *yyTraceFILE = 0;
 static char *yyTracePrompt = 0;
@@ -192,7 +192,7 @@ void ParseTrace(FILE *TraceFILE, char *zTracePrompt){
 /* For tracing shifts, the names of all terminals and nonterminals
 ** are required.  The following table supplies these names */
 static const char *const yyTokenName[] = { 
-%%
+%% // 第六个百分号干的事情就是: 输出包括$ 跟error 在内的终结符号。
 };
 #endif /* NDEBUG */
 
@@ -200,7 +200,7 @@ static const char *const yyTokenName[] = {
 /* For tracing reduce actions, the names of all rules are required.
 */
 static const char *const yyRuleName[] = {
-%%
+%% // 第七个百分号干的事情就是: 输出所有的产生式。
 };
 #endif /* NDEBUG */
 
@@ -236,7 +236,7 @@ void *ParseAlloc(void *(*mallocProc)(size_t)){
   yyParser *pParser;
   pParser = (yyParser*)(*mallocProc)( (size_t)sizeof(yyParser) );
   if( pParser ){
-    pParser->yyidx = -1;
+    pParser->yyidx = -1; // 栈顶符号yyidx设置成-1
   }
   return pParser;
 }
@@ -258,7 +258,7 @@ static void yy_destructor(YYCODETYPE yymajor, YYMINORTYPE *yypminor){
     ** which appear on the RHS of the rule, but which are not used
     ** inside the C code.
     */
-%%
+%% // 第八个百分号干的事情就是:yy_destructor函数  。
     default:  break;   /* If no destructor action specified: do nothing */
   }
 }
@@ -407,7 +407,7 @@ static void yy_shift(
      while( yypParser->yyidx>=0 ) yy_pop_parser_stack(yypParser);
      /* Here code is inserted which will execute if the parser
      ** stack every overflows */
-%%
+%% // 第九个百分号干的事情就是: 处理%stack_over申明符的代码。  。
      ParseARG_STORE; /* Suppress warning about unused %extra_argument var */
      return;
   }
@@ -434,8 +434,8 @@ static const struct {
   YYCODETYPE lhs;         /* Symbol on the left-hand side of the rule */
   unsigned char nrhs;     /* Number of right-hand side symbols in the rule */
 } yyRuleInfo[] = {
-%%
-};
+%%   // 第10个百分号干的事情就是:  输出产生式的左边符号index  跟右边符号的总数量。  。
+};   // 作用是:当一条产生式的右部所有符号均已经入栈,且又到了需要退栈的时候,他需要退出多少个符号的数目
 
 static void yy_accept(yyParser*);  /* Forward Declaration */
 
@@ -483,7 +483,7 @@ static void yy_reduce(
   **  #line <lineno> <thisfile>
   **     break;
   */
-%%
+%%  // 第11个百分号干的事情就是:  。 输出y文件中的那个reduce对应的那个产生式的的代码。 。
   };
   yygoto = yyRuleInfo[yyruleno].lhs;
   yysize = yyRuleInfo[yyruleno].nrhs;
@@ -526,7 +526,7 @@ static void yy_parse_failed(
   while( yypParser->yyidx>=0 ) yy_pop_parser_stack(yypParser);
   /* Here code is inserted which will be executed whenever the
   ** parser fails */
-%%
+%%  //第12个双百分号:输出fail code
   ParseARG_STORE; /* Suppress warning about unused %extra_argument variable */
 }
 
@@ -540,7 +540,7 @@ static void yy_syntax_error(
 ){
   ParseARG_FETCH;
 #define TOKEN (yyminor.yy0)
-%%
+%% //第13个双百分号:输出error code
   ParseARG_STORE; /* Suppress warning about unused %extra_argument variable */
 }
 
@@ -559,7 +559,7 @@ static void yy_accept(
   while( yypParser->yyidx>=0 ) yy_pop_parser_stack(yypParser);
   /* Here code is inserted which will be executed whenever the
   ** parser accepts */
-%%
+%% //第14个双百分号:输出error code
   ParseARG_STORE; /* Suppress warning about unused %extra_argument variable */
 }
 
